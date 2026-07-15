@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Làm giàu ngữ cảnh: Chunk Headers, RSE, Compression, Augmentation — Sổ tay RAG</title>
+<style>
+:root{
+  --bg:#F7F8FC; --surface:#FFFFFF; --ink:#16213A; --ink-soft:#4A5570;
+  --line:#DDE2EF; --primary:#3B4CC0; --primary-soft:#E8EBFA;
+  --amber:#B97C1D; --amber-soft:#FBF3E2; --teal:#1F8A70; --teal-soft:#E3F4EF;
+  --rose:#B0455A; --rose-soft:#F9E9ED;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+  --sans:"Be Vietnam Pro","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.7;font-size:16.5px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px}
+a{color:var(--primary)}
+#progress{position:fixed;top:0;left:0;height:3px;background:var(--amber);width:0;z-index:99}
+header{background:var(--ink);color:#EDF0FA;padding:44px 0 34px}
+.crumb{font-family:var(--mono);font-size:.78rem;color:#9FB0E8}
+.crumb a{color:#9FB0E8;text-decoration:none}
+.crumb a:hover{text-decoration:underline}
+header h1{font-size:clamp(1.7rem,4vw,2.4rem);font-weight:800;margin:.5rem 0;letter-spacing:-.02em;line-height:1.2}
+header p{color:#C3CCE8;max-width:660px}
+.rail-panel{background:#101830;padding:14px 0 20px}
+.rail-panel svg{display:block;margin:0 auto}
+nav.toc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:26px auto;max-width:860px}
+nav.toc b{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+nav.toc ol{margin:8px 0 0 20px}
+nav.toc li{padding:2px 0}
+section.tech{padding:36px 0 10px}
+.tech-head{border-left:5px solid var(--amber);padding-left:16px;margin-bottom:20px}
+.tech-head .kicker{font-family:var(--mono);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber)}
+.tech-head h2{font-size:1.7rem;font-weight:800}
+.badges{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.badge{font-family:var(--mono);font-size:.68rem;padding:2px 9px;border-radius:99px}
+.lv1{background:var(--teal-soft);color:var(--teal)} .lv2{background:var(--amber-soft);color:var(--amber)}
+.stage-idx{background:var(--teal-soft);color:var(--teal)}
+.stage-post{background:var(--amber-soft);color:var(--amber)}
+h3{font-size:1.12rem;font-weight:700;margin:28px 0 8px}
+p{margin-bottom:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0;overflow-x:auto}
+.problem{border-left:4px solid var(--rose);background:var(--rose-soft)}
+.insight{border-left:4px solid var(--teal);background:var(--teal-soft)}
+.problem b,.insight b{display:block;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.problem b{color:var(--rose)} .insight b{color:var(--teal)}
+pre{background:#101830;color:#D9E0F5;font-family:var(--mono);font-size:.82rem;line-height:1.6;padding:16px 18px;border-radius:12px;overflow-x:auto;margin:14px 0}
+pre .c{color:#7A88B8} pre .k{color:#FFC96B} pre .s{color:#8FD3B6}
+code{font-family:var(--mono);font-size:.85em;background:var(--primary-soft);color:var(--primary);padding:1px 6px;border-radius:5px}
+pre code{background:none;color:inherit;padding:0}
+.demo{background:var(--surface);border:2px solid var(--amber);border-radius:14px;padding:20px;margin:18px 0}
+.demo .demo-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.demo .demo-tag::before{content:"▶";font-size:.6rem}
+.controls{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;align-items:center}
+button{font-family:var(--sans);font-size:.9rem;padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+button.primary{background:var(--amber);border-color:var(--amber);color:#fff;font-weight:600}
+button.primary:hover{background:#9C6716}
+button.mode{border:1.5px solid var(--line)}
+button.mode.on{border-color:var(--amber);background:var(--amber-soft);color:var(--amber);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,input:focus-visible{outline:3px solid #9FB0E8;outline-offset:1px}
+.hint{font-size:.84rem;color:var(--ink-soft);margin-top:8px}
+
+/* CCH demo */
+.chunk-card{border:1.5px solid var(--line);border-radius:10px;padding:0;overflow:hidden;margin-top:10px;background:#fff}
+.chunk-head{background:var(--amber-soft);color:var(--amber);font-family:var(--mono);font-size:.76rem;padding:8px 12px;border-bottom:1px dashed var(--amber);max-height:0;opacity:0;overflow:hidden;transition:max-height .4s, opacity .4s, padding .4s}
+.chunk-head.show{max-height:80px;opacity:1;padding:8px 12px}
+.chunk-body{padding:11px 13px;font-size:.9rem}
+.embed-result{font-family:var(--mono);font-size:.82rem;margin-top:10px;padding:10px 12px;border-radius:9px;border:1.5px solid}
+.embed-result.miss{background:var(--rose-soft);border-color:var(--rose);color:var(--rose)}
+.embed-result.hit{background:var(--teal-soft);border-color:var(--teal);color:var(--teal)}
+
+/* RSE demo */
+.strip{display:flex;gap:3px;margin-top:12px;flex-wrap:wrap}
+.ch{flex:1;min-width:52px;text-align:center;font-family:var(--mono);font-size:.72rem;padding:14px 4px;border-radius:7px;background:var(--bg);border:1.5px solid var(--line);position:relative;transition:all .3s}
+.ch.rel{background:var(--amber-soft);border-color:var(--amber);color:var(--amber);font-weight:700}
+.ch.seg{background:var(--teal-soft);border-color:var(--teal)}
+.seg-band{margin-top:10px;font-size:.85rem}
+.seg-band .segbox{display:inline-block;background:var(--teal-soft);border:1.5px solid var(--teal);border-radius:8px;padding:4px 10px;margin:3px;font-family:var(--mono);font-size:.76rem;color:var(--teal)}
+
+/* Context window demo */
+.cw-sents{display:flex;flex-direction:column;gap:5px;margin-top:12px}
+.cw-sents .s{font-size:.86rem;padding:8px 11px;border-radius:8px;border:1.5px solid var(--line);background:var(--bg);transition:all .35s}
+.cw-sents .s.core{border-color:var(--amber);background:var(--amber-soft);font-weight:600}
+.cw-sents .s.win{border-color:var(--teal);background:var(--teal-soft)}
+
+/* Compression demo */
+.doc-long{font-size:.87rem;line-height:1.85}
+.doc-long .rel{background:var(--teal-soft);border-bottom:2px solid var(--teal);padding:1px 2px;border-radius:3px}
+.doc-long .irrel{transition:opacity .4s, color .4s}
+.doc-long.compressed .irrel{opacity:.22}
+.token-meter{display:flex;gap:14px;align-items:center;margin-top:12px;font-family:var(--mono);font-size:.82rem}
+.token-pill{background:var(--ink);color:#D9E0F5;padding:4px 12px;border-radius:99px}
+.token-pill b{color:#FFC96B}
+
+/* Augmentation demo */
+.aug-chunk{font-size:.88rem;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:11px 13px}
+.aug-q{list-style:none;margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.aug-q li{font-size:.85rem;border:1.5px solid var(--line);border-radius:8px;padding:8px 12px;background:#fff;transition:all .3s}
+.aug-q li.match{border-color:var(--teal);background:var(--teal-soft)}
+.aug-q li .tag{font-family:var(--mono);font-size:.7rem;color:var(--amber);margin-right:6px}
+
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.duo .col{border-radius:12px;padding:16px 18px}
+.duo .yes{background:var(--teal-soft);border:1px solid #BADFD2}
+.duo .no{background:var(--rose-soft);border:1px solid #EBC6CE}
+.duo h4{font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.duo .yes h4{color:var(--teal)} .duo .no h4{color:var(--rose)}
+.duo ul{margin-left:18px;font-size:.9rem}
+.duo li{margin-bottom:6px}
+@media (max-width:620px){.duo{grid-template-columns:1fr}}
+.quiz{background:var(--amber-soft);border:1px solid #EAD9B4;border-radius:14px;padding:20px;margin:20px 0}
+.quiz .q-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:8px}
+.quiz p.q{font-weight:600;margin-bottom:10px}
+.quiz .opts{display:flex;flex-direction:column;gap:8px}
+.quiz .opt{text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:9px 13px;font-size:.92rem;cursor:pointer}
+.quiz .opt:hover{border-color:var(--amber)}
+.quiz .opt.right{border-color:var(--teal);background:var(--teal-soft)}
+.quiz .opt.wrong{border-color:var(--rose);background:var(--rose-soft)}
+.quiz .expl{display:none;margin-top:10px;font-size:.88rem;background:#fff;border-radius:9px;padding:10px 13px}
+.quiz .expl.show{display:block}
+table{width:100%;border-collapse:collapse;background:var(--surface);font-size:.88rem}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--ink);color:#EDF0FA;font-size:.76rem;text-transform:uppercase;letter-spacing:.05em}
+.table-scroll{overflow-x:auto;border-radius:12px;border:1px solid var(--line);margin:14px 0}
+.summary{background:var(--ink);color:#D9E0F5;border-radius:14px;padding:24px;margin:30px 0}
+.summary h3{color:#FFC96B;margin-top:0}
+.summary ul{margin-left:20px}
+.summary li{margin-bottom:8px}
+.nav-next{display:flex;justify-content:space-between;gap:12px;padding:10px 0 50px;flex-wrap:wrap}
+.nav-next a{text-decoration:none;font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 18px}
+.nav-next a:hover{border-color:var(--primary)}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<header>
+  <div class="wrap">
+    <div class="crumb"><a href="index.html">← Trang tổng quan</a> · Nhóm Làm giàu ngữ cảnh · Batch 3</div>
+    <h1>Làm giàu ngữ cảnh — vá điểm mù của chunk</h1>
+    <p>Chunk là con dao hai lưỡi: cắt nhỏ để khớp chính xác thì mất ngữ cảnh xung quanh. Nhóm này gồm năm cách <b>bù lại ngữ cảnh đã mất</b> — thêm tiêu đề, mở rộng cửa sổ, ghép đoạn, nén phần thừa, hay sinh thêm câu hỏi — mà không phải hy sinh độ sắc của embedding.</p>
+  </div>
+</header>
+
+<div class="rail-panel">
+  <svg viewBox="0 0 760 56" width="100%" style="max-width:820px" role="img" aria-label="Nhóm làm giàu ngữ cảnh trải trên lập chỉ mục và hậu xử lý">
+    <line x1="20" y1="28" x2="740" y2="28" stroke="#2A3560" stroke-width="2"/>
+    <g font-size="11" text-anchor="middle">
+      <circle cx="80" cy="28" r="10" fill="#FFC96B"/><text x="80" y="52" fill="#FFC96B" font-weight="700">Lập chỉ mục ◀</text>
+      <circle cx="240" cy="28" r="7" fill="#2A3560"/><text x="240" y="52" fill="#6C7BB0">Truy vấn</text>
+      <circle cx="400" cy="28" r="7" fill="#2A3560"/><text x="400" y="52" fill="#6C7BB0">Truy xuất</text>
+      <circle cx="560" cy="28" r="10" fill="#FFC96B"/><text x="560" y="52" fill="#FFC96B" font-weight="700">Hậu xử lý ◀</text>
+      <circle cx="700" cy="28" r="7" fill="#2A3560"/><text x="700" y="52" fill="#6C7BB0">Sinh</text>
+    </g>
+    <text x="380" y="14" text-anchor="middle" font-size="11" fill="#6C7BB0">Một số kỹ thuật sửa lúc lập chỉ mục, một số bù ngữ cảnh ngay sau khi truy xuất</text>
+  </svg>
+</div>
+
+<nav class="toc wrap">
+  <b>Trong bài này</b>
+  <ol>
+    <li><a href="#cch">Contextual Chunk Headers</a> — gắn "địa chỉ" cho mỗi chunk</li>
+    <li><a href="#window">Context Window Enhancement</a> — embed câu, trả cả xóm</li>
+    <li><a href="#rse">Relevant Segment Extraction</a> — ghép chunk liền kề thành đoạn</li>
+    <li><a href="#compress">Contextual Compression</a> — nén bỏ phần thừa</li>
+    <li><a href="#augment">Document Augmentation</a> — sinh câu hỏi cho mỗi chunk</li>
+    <li><a href="#compare">Tổng kết & bước tiếp</a></li>
+  </ol>
+</nav>
+
+<!-- ================= CCH ================= -->
+<section class="tech" id="cch">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 1/5</div>
+      <h2>Contextual Chunk Headers (CCH)</h2>
+      <div class="badges"><span class="badge lv1">Cấp 1</span><span class="badge stage-idx">Giai đoạn: Lập chỉ mục</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Một chunk tách khỏi tài liệu thường mất "địa chỉ" của nó. Chunk chỉ ghi "Giới hạn là 100 request mỗi phút." — nhưng giới hạn của <i>endpoint nào</i>, thuộc <i>phiên bản API nào</i>, <i>mục nào</i>? Thông tin đó nằm ở tiêu đề tài liệu và tiêu đề mục, không có trong chunk. Embedding của chunk mồ côi này khớp mờ với mọi truy vấn.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Trước khi embed, <b>prepend một dòng tiêu đề ngữ cảnh</b> vào đầu mỗi chunk: tên tài liệu + tên mục. Chunk giờ mang theo "địa chỉ" của mình → embedding biết nó nói về điều gì, khớp truy vấn chính xác hơn hẳn. Rẻ, đơn giản, hiệu quả cao.
+    </div>
+
+    <div class="demo" id="cch-demo">
+      <div class="demo-tag">Demo mô phỏng — bật/tắt tiêu đề ngữ cảnh</div>
+      <p style="font-size:.9rem">Truy vấn: <span style="font-family:var(--mono);background:var(--amber-soft);color:var(--amber);padding:1px 7px;border-radius:6px">"giới hạn rate limit của API tìm kiếm là bao nhiêu?"</span></p>
+      <div class="controls" role="group">
+        <button class="mode on" data-cch="off">Chunk trần</button>
+        <button class="mode" data-cch="on">Có tiêu đề ngữ cảnh</button>
+      </div>
+      <div class="chunk-card">
+        <div class="chunk-head" id="cch-head">📄 API Reference v3 › Mục 2: Endpoint Tìm kiếm (Search)</div>
+        <div class="chunk-body">"Giới hạn là 100 request mỗi phút. Áp dụng cho cả gói Free và gói Pro."</div>
+      </div>
+      <div class="embed-result miss" id="cch-result"></div>
+    </div>
+
+<pre><code>header = f<span class="s">"{doc_title} › {section_title}"</span>
+<span class="k">for</span> chunk <span class="k">in</span> chunks:
+    text_to_embed = header + <span class="s">"\n"</span> + chunk.text   <span class="c"># prepend, rồi mới embed</span>
+    store.add(embed(text_to_embed), original=chunk.text)</code></pre>
+
+    <div class="quiz" data-answer="1">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Vì sao CCH đặc biệt hiệu quả với tài liệu có cấu trúc phân cấp sâu (API Reference, sổ tay kỹ thuật)?</p>
+      <div class="opts">
+        <button class="opt">Vì tài liệu kỹ thuật ngắn hơn văn bản thường</button>
+        <button class="opt">Vì một mục con thường tham chiếu ngầm tới mục cha ("tham số này mặc định là...") — tiêu đề khôi phục đúng ngữ cảnh phân cấp đó vào chunk</button>
+        <button class="opt">Vì tài liệu kỹ thuật không cần embedding</button>
+      </div>
+      <div class="expl">Tài liệu kỹ thuật đầy tham chiếu ngầm: một mục con chỉ có nghĩa khi biết nó thuộc endpoint nào, phiên bản nào. Tách ra thì "tham số này", "phương thức nêu trên" mất nghĩa. Header dạng "API v3 › Search › Rate limit" khôi phục cấu trúc phân cấp — đây là lý do CCH gần như bắt buộc với tài liệu phân cấp sâu.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CONTEXT WINDOW ================= -->
+<section class="tech" id="window">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 2/5</div>
+      <h2>Context Window Enhancement</h2>
+      <div class="badges"><span class="badge lv1">Cấp 1</span><span class="badge stage-post">Index + Hậu xử lý</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Muốn khớp chính xác thì nên embed đơn vị nhỏ (từng câu). Nhưng một câu trúng truy vấn, khi đứng một mình, lại thiếu câu trước/sau để LLM hiểu trọn — ví dụ câu "Điều này không áp dụng với trường hợp trên." vô nghĩa nếu không có câu phía trước.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Tách đôi hai việc: <b>embed từng câu</b> (để khớp sắc), nhưng khi một câu trúng thì <b>trả về cả cửa sổ</b> gồm câu đó cộng vài câu lân cận. Bạn được cả độ chính xác của câu lẻ lẫn ngữ cảnh của đoạn.
+    </div>
+
+    <div class="demo" id="cw-demo">
+      <div class="demo-tag">Demo mô phỏng — điều chỉnh kích thước cửa sổ</div>
+      <p style="font-size:.9rem">Câu <span style="color:var(--amber);font-weight:700">vàng</span> là câu khớp truy vấn "khi nào job được miễn retry?". Kéo cửa sổ để lấy thêm câu lân cận (<span style="color:var(--teal);font-weight:700">xanh</span>).</p>
+      <div class="controls">
+        <label for="cw-win" style="font-size:.88rem">Cửa sổ ±</label>
+        <input type="range" id="cw-win" min="0" max="2" step="1" value="0" style="width:130px;accent-color:var(--amber)">
+        <span style="font-family:var(--mono);font-size:.82rem;background:var(--amber-soft);color:var(--amber);padding:2px 8px;border-radius:6px" id="cw-win-val">±0 câu</span>
+      </div>
+      <div class="cw-sents" id="cw-sents"></div>
+      <div class="hint" id="cw-hint"></div>
+    </div>
+
+    <div class="quiz" data-answer="0">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Kéo cửa sổ lên ±2. Đánh đổi nào xuất hiện khi cửa sổ quá lớn?</p>
+      <div class="opts">
+        <button class="opt">Ngữ cảnh đầy đủ hơn nhưng kéo vào nhiều câu không liên quan → LLM tốn token và có thể bị nhiễu</button>
+        <button class="opt">Câu khớp bị mất, chỉ còn câu lân cận</button>
+        <button class="opt">Không có đánh đổi nào, cửa sổ càng lớn càng tốt</button>
+      </div>
+      <div class="expl">Cửa sổ là nút cân bằng khác: quá nhỏ (±0) thì câu lẻ thiếu ngữ cảnh, quá lớn thì lôi vào câu vô quan, tốn token và loãng tín hiệu. Điểm ngọt thường là ±1 tới ±2 tùy độ dài câu và loại tài liệu.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= RSE ================= -->
+<section class="tech" id="rse">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 3/5</div>
+      <h2>Relevant Segment Extraction (RSE)</h2>
+      <div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge stage-post">Giai đoạn: Hậu xử lý</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Câu trả lời đôi khi trải dài qua nhiều chunk liên tiếp. Truy xuất top-k thường vớt được vài chunk liên quan nhưng <b>rời rạc</b> — chunk 5, chunk 6, chunk 12 — trong khi lời giải thật sự là <i>đoạn liền mạch từ chunk 5 đến 8</i>. LLM nhận các mảnh đứt quãng, khó ghép mạch.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Sau khi truy xuất, nhìn vào <b>vị trí</b> của các chunk trúng trong tài liệu gốc. Nếu nhiều chunk liên quan nằm <i>gần nhau</i>, ghép chúng (kèm chunk ở giữa) thành một <b>đoạn liền mạch</b>. Trả về đoạn thay vì các mảnh — LLM đọc được một mạch lý luận trọn vẹn.
+    </div>
+
+    <div class="demo" id="rse-demo">
+      <div class="demo-tag">Demo mô phỏng — ghép chunk rời thành đoạn</div>
+      <p style="font-size:.9rem">Dải 14 chunk của một tài liệu. Chunk <span style="color:var(--amber);font-weight:700">vàng</span> = trúng truy vấn (điểm liên quan cao). Nhấn để RSE ghép các chunk trúng nằm gần nhau thành đoạn.</p>
+      <div class="controls">
+        <button class="primary" id="rse-btn">Chạy RSE ▸</button>
+        <button id="rse-reset">↺ Làm lại</button>
+      </div>
+      <div class="strip" id="rse-strip"></div>
+      <div class="seg-band" id="rse-seg"></div>
+      <div class="hint" id="rse-hint">Trước RSE: 4 chunk rời rạc (5, 6, 7, 11) được trả về như những mảnh độc lập.</div>
+    </div>
+
+    <div class="duo">
+      <div class="col yes"><h4>Nên dùng khi</h4><ul>
+        <li>Tài liệu có lập luận dài, trải nhiều đoạn (design doc, postmortem, whitepaper).</li>
+        <li>Chunk nhỏ giúp khớp tốt nhưng câu trả lời cần mạch dài.</li>
+      </ul></div>
+      <div class="col no"><h4>Không nên / lưu ý</h4><ul>
+        <li>Tài liệu rời rạc (FAQ, danh sách) — chunk cạnh nhau không liên quan về nội dung.</li>
+        <li>Cần giữ metadata vị trí (thứ tự chunk) từ lúc lập chỉ mục — không có thì không ghép được.</li>
+      </ul></div>
+    </div>
+
+    <div class="quiz" data-answer="2">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">RSE khác Context Window Enhancement ở điểm cốt lõi nào?</p>
+      <div class="opts">
+        <button class="opt">RSE chạy lúc lập chỉ mục, Context Window chạy lúc truy vấn</button>
+        <button class="opt">Chúng giống hệt nhau</button>
+        <button class="opt">Context Window mở rộng cố định ±N quanh MỘT câu khớp; RSE ghép ĐỘNG nhiều chunk trúng nằm gần nhau, độ dài đoạn thay đổi theo dữ liệu</button>
+      </div>
+      <div class="expl">Context Window luôn lấy ±N cố định quanh một điểm khớp. RSE thông minh hơn: nó nhìn <i>cụm</i> chunk trúng và ghép động — nếu chunk 5-8 đều liên quan thì ghép cả 4, nếu chỉ chunk 5 trúng thì đoạn ngắn. Độ dài thích ứng theo mật độ liên quan thực tế.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPRESSION ================= -->
+<section class="tech" id="compress">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 4/5</div>
+      <h2>Contextual Compression</h2>
+      <div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge stage-post">Giai đoạn: Hậu xử lý</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Chunk truy xuất được thường "đúng chỗ nhưng thừa chữ": trong 500 ký tự, chỉ 1-2 câu thực sự trả lời truy vấn, phần còn lại là văn cảnh không liên quan. Nhồi cả chunk vào LLM tốn token, làm loãng tín hiệu, và với nhiều chunk thì tràn cửa sổ ngữ cảnh.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Sau khi truy xuất, cho một LLM <b>nén mỗi chunk</b>: chỉ giữ lại phần liên quan tới truy vấn, vứt phần thừa. Đầu vào cho LLM sinh câu trả lời trở nên ngắn, đậm đặc thông tin — tiết kiệm token và tăng độ tập trung.
+    </div>
+
+    <div class="demo" id="cmp-demo">
+      <div class="demo-tag">Demo mô phỏng — nén theo truy vấn</div>
+      <p style="font-size:.9rem">Truy vấn: <span style="font-family:var(--mono);background:var(--amber-soft);color:var(--amber);padding:1px 7px;border-radius:6px">"cách bật chế độ debug?"</span>. Phần <span style="color:var(--teal);font-weight:700">xanh</span> là nội dung liên quan.</p>
+      <div class="controls" role="group">
+        <button class="mode on" data-cmp="off">Chunk gốc</button>
+        <button class="mode" data-cmp="on">Sau khi nén</button>
+      </div>
+      <div class="panel doc-long" id="cmp-doc">
+        <span class="irrel">Cảm ơn bạn đã sử dụng thư viện của chúng tôi. Cộng đồng đóng góp đã lên tới hàng nghìn lập trình viên trên khắp thế giới. </span><span class="rel">Để bật chế độ debug, đặt biến môi trường <code>APP_LOG_LEVEL=debug</code> trước khi khởi động ứng dụng.</span><span class="irrel"> Chúng tôi cũng có nhiều tài liệu hướng dẫn và video hấp dẫn, mời bạn theo dõi kênh cộng đồng để cập nhật. Thư viện được thiết kế với API tối giản, phù hợp nhiều kiểu dự án.</span>
+      </div>
+      <div class="token-meter">
+        <span class="token-pill">Token đầu vào: <b id="cmp-tok">~78</b></span>
+        <span class="hint" id="cmp-hint" style="margin:0">Chunk gốc: phần lớn là văn xã giao, chỉ 1 câu trả lời thực sự.</span>
+      </div>
+    </div>
+
+    <div class="quiz" data-answer="1">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Rủi ro chính của Contextual Compression là gì?</p>
+      <div class="opts">
+        <button class="opt">Làm tăng token đầu vào</button>
+        <button class="opt">LLM nén có thể vô tình cắt mất thông tin sẽ cần cho câu trả lời, hoặc thêm một tầng chi phí + latency nữa</button>
+        <button class="opt">Không thể dùng chung với reranking</button>
+      </div>
+      <div class="expl">Nén là con dao hai lưỡi: nén sai tay thì mất chi tiết quan trọng (LLM tưởng thừa nhưng thực ra cần). Ngoài ra mỗi chunk cần thêm một LLM call để nén → cộng chi phí và độ trễ. Đánh đổi: tiết kiệm token sinh vs tốn token nén. Chỉ đáng khi chunk dài và tỷ lệ thừa cao.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= AUGMENTATION ================= -->
+<section class="tech" id="augment">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 5/5</div>
+      <h2>Document Augmentation</h2>
+      <div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge stage-idx">Giai đoạn: Lập chỉ mục</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Người dùng đặt câu hỏi bằng ngôn ngữ tự nhiên; tài liệu viết bằng văn phong trần thuật. Khoảng cách hình dạng này (giống bài toán của HyDE) làm truy vấn khớp mờ với chunk.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Lúc lập chỉ mục, dùng LLM <b>sinh các câu hỏi</b> mà mỗi chunk có thể trả lời, rồi lập chỉ mục <i>cả câu hỏi lẫn chunk</i>. Khi người dùng hỏi, truy vấn của họ khớp với câu-hỏi-sinh-sẵn (câu ↔ câu, dễ khớp) → dẫn về đúng chunk. Đây chính là tinh thần của HyPE, nhìn từ phía tài liệu.
+    </div>
+
+    <div class="demo" id="aug-demo">
+      <div class="demo-tag">Demo mô phỏng — sinh câu hỏi & khớp truy vấn</div>
+      <div class="aug-chunk">Chunk gốc: "Kết nối idle quá 12 phút sẽ bị pool đóng tự động; cứ mỗi 5 kết nối vượt ngưỡng, hệ thống mở thêm 1 worker."</div>
+      <div class="controls">
+        <button class="primary" id="aug-btn">Sinh câu hỏi cho chunk ▸</button>
+        <button id="aug-reset">↺ Làm lại</button>
+      </div>
+      <ul class="aug-q" id="aug-out"></ul>
+      <div id="aug-query" style="display:none">
+        <div style="font-family:var(--mono);font-size:.84rem;background:var(--ink);color:#D9E0F5;border-radius:9px;padding:9px 12px;margin:12px 0 4px">Người dùng hỏi: "quá tải kết nối thì có tự thêm worker không?"</div>
+        <div class="hint" id="aug-hint"></div>
+      </div>
+    </div>
+
+    <div class="quiz" data-answer="0">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Document Augmentation và HyDE cùng thu hẹp "khoảng cách câu hỏi–tài liệu". Khác biệt then chốt về chi phí là gì?</p>
+      <div class="opts">
+        <button class="opt">Augmentation trả chi phí LLM một lần lúc lập chỉ mục; HyDE trả mỗi lần người dùng hỏi</button>
+        <button class="opt">Augmentation đắt hơn HyDE ở mọi khía cạnh</button>
+        <button class="opt">Cả hai đều không dùng LLM</button>
+      </div>
+      <div class="expl">Cùng một ý tưởng (biến truy xuất thành khớp câu-với-câu), khác vị trí trả chi phí. Augmentation/HyPE sinh câu hỏi <i>trước</i>, lúc index → query time nhanh, nhưng index tốn kém và cứng (kho đổi phải sinh lại). HyDE sinh <i>lúc hỏi</i> → linh hoạt nhưng cộng latency mỗi truy vấn. Đây là đánh đổi index-time vs query-time lặp lại xuyên suốt RAG.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPARE ================= -->
+<section class="tech" id="compare">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Tổng kết nhóm</div>
+      <h2>So sánh & cách phối hợp</h2>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Kỹ thuật</th><th>Chạy lúc</th><th>Chi phí</th><th>Bù lại điều gì</th><th>Phù hợp nhất</th></tr></thead>
+      <tbody>
+        <tr><td><b>Chunk Headers</b></td><td>Index</td><td>Rất thấp</td><td>"Địa chỉ" tài liệu/mục của chunk</td><td>Tài liệu phân cấp: API reference, sổ tay, wiki</td></tr>
+        <tr><td><b>Context Window</b></td><td>Index + Query</td><td>Thấp</td><td>Câu lân cận quanh câu khớp</td><td>Văn xuôi, embed cấp câu</td></tr>
+        <tr><td><b>RSE</b></td><td>Hậu xử lý</td><td>Thấp (cần metadata vị trí)</td><td>Mạch liền của nhiều chunk gần nhau</td><td>Lập luận dài trải nhiều đoạn</td></tr>
+        <tr><td><b>Compression</b></td><td>Hậu xử lý</td><td>+1 LLM call/chunk</td><td>Loại bỏ phần thừa, tiết kiệm token</td><td>Chunk dài, tỷ lệ nhiễu cao</td></tr>
+        <tr><td><b>Augmentation</b></td><td>Index</td><td>LLM cho mọi chunk (index)</td><td>Khoảng cách câu hỏi–tài liệu</td><td>Kho ổn định, câu hỏi tự nhiên nhiều</td></tr>
+      </tbody>
+    </table></div>
+
+    <p>Các kỹ thuật này <b>cộng dồn được</b>, không loại trừ nhau. Một cấu hình điển hình cho tài liệu kỹ thuật: Chunk Headers (địa chỉ mục/endpoint) lúc index → RSE ghép mạch lúc truy xuất → Compression cắt phần thừa trước khi đưa vào LLM.</p>
+
+    <div class="summary">
+      <h3>Ghi nhớ 5 điều</h3>
+      <ul>
+        <li>Cùng một mục tiêu: <b>giữ độ sắc của chunk nhỏ mà không mất ngữ cảnh</b> — khác nhau ở chỗ bù ngữ cảnh bằng cách nào.</li>
+        <li>Chunk Headers là kỹ thuật "lời-lãi" nhất: chi phí gần như bằng 0, hiệu quả cao, gần bắt buộc với tài liệu phân cấp.</li>
+        <li>Context Window vs RSE: một bên mở rộng <b>cố định</b> quanh câu, một bên ghép <b>động</b> theo cụm chunk trúng.</li>
+        <li>Compression đổi token-sinh lấy token-nén + latency — chỉ đáng khi chunk dài và thừa nhiều.</li>
+        <li>Augmentation là HyPE nhìn từ phía tài liệu: trả chi phí lúc index để query time nhanh.</li>
+      </ul>
+    </div>
+
+    <div class="nav-next">
+      <a href="02-retrieval.html">← Xem lại: Semantic Chunking</a>
+      <a href="index.html">Trang tổng quan →</a>
+    </div>
+    <p style="font-size:.85rem;color:var(--ink-soft)">Batch 3 hoàn tất nhóm Làm giàu ngữ cảnh (15/35 kỹ thuật). Batch tiếp theo: hoàn thiện nhóm Truy xuất nâng cao (Hierarchical Indices, Dartboard, Multi-faceted Filtering, Multi-modal RAG).</p>
+  </div>
+</section>
+
+<script>
+/* progress */
+addEventListener('scroll',()=>{
+  const h=document.documentElement;
+  document.getElementById('progress').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';
+},{passive:true});
+
+/* ---------- CCH ---------- */
+function cchRender(on){
+  document.getElementById('cch-head').classList.toggle('show',on);
+  const r=document.getElementById('cch-result');
+  if(on){
+    r.className='embed-result hit';
+    r.textContent='✔ Khớp cao (0.88): tiêu đề "Endpoint Tìm kiếm" đưa từ khóa quyết định vào embedding — chunk giờ biết nó nói về API tìm kiếm, dù thân chunk không hề nhắc lại cụm đó.';
+  }else{
+    r.className='embed-result miss';
+    r.textContent='✗ Khớp thấp (0.41): thân chunk chỉ nói "100 request mỗi phút" — không có chữ "tìm kiếm" hay "rate limit" nào. Truy vấn khớp mờ, dễ bị chunk khác vượt.';
+  }
+}
+document.querySelectorAll('#cch-demo .mode').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#cch-demo .mode').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); cchRender(b.dataset.cch==='on');
+}));
+cchRender(false);
+
+/* ---------- Context Window ---------- */
+const CWS=[
+ 'Job đồng bộ sẽ thất bại nếu nguồn dữ liệu không phản hồi.',
+ 'Mỗi lần thất bại được ghi vào bảng sync_errors kèm mã lỗi.',
+ 'Job được miễn retry nếu lỗi thuộc nhóm lỗi không thể phục hồi.',
+ 'Nhóm lỗi không thể phục hồi gồm: sai xác thực, sai schema, và payload vượt giới hạn.',
+ 'Quản trị viên phải xử lý thủ công trong vòng 7 ngày.'
+];
+const CW_CORE=2;
+const cwW=document.getElementById('cw-win');
+function cwRender(){
+  const w=+cwW.value;
+  document.getElementById('cw-win-val').textContent='±'+w+' câu';
+  const box=document.getElementById('cw-sents'); box.innerHTML='';
+  CWS.forEach((s,i)=>{
+    const d=document.createElement('div');
+    const inWin=Math.abs(i-CW_CORE)<=w;
+    d.className='s '+(i===CW_CORE?'core':(inWin?'win':''));
+    d.textContent=s;
+    box.appendChild(d);
+  });
+  let note;
+  if(w===0)note='±0: chỉ câu khớp "miễn retry nếu lỗi không thể phục hồi" — nhưng "không thể phục hồi" là gì? Câu sau (định nghĩa) bị thiếu, LLM có thể trả lời cụt.';
+  else if(w===1)note='±1: thêm câu định nghĩa "gồm sai xác thực, sai schema, payload vượt giới hạn". Giờ LLM đủ ngữ cảnh trả lời trọn vẹn. Điểm ngọt.';
+  else note='±2: đủ ngữ cảnh nhưng đã lôi vào câu "ghi vào bảng sync_errors" không liên quan tới câu hỏi miễn retry — thừa token, thêm nhiễu.';
+  document.getElementById('cw-hint').textContent=note;
+}
+cwW.addEventListener('input',cwRender); cwRender();
+
+/* ---------- RSE ---------- */
+const REL=[5,6,7,11]; // relevant chunk indices (1-based)
+const N=14;
+function rseStrip(seg){
+  const strip=document.getElementById('rse-strip'); strip.innerHTML='';
+  // segments: 5-7 merged (with contiguous), 11 alone
+  const segSet = seg ? new Set([5,6,7]) : new Set();
+  for(let i=1;i<=N;i++){
+    const c=document.createElement('div');
+    let cls='ch';
+    if(seg && segSet.has(i))cls+=' seg';
+    else if(REL.includes(i))cls+=' rel';
+    c.className=cls; c.textContent=i;
+    strip.appendChild(c);
+  }
+}
+document.getElementById('rse-btn').addEventListener('click',()=>{
+  rseStrip(true);
+  document.getElementById('rse-seg').innerHTML='<span class="segbox">Đoạn A = chunk 5–7 (ghép liền)</span><span class="segbox">Đoạn B = chunk 11</span>';
+  document.getElementById('rse-hint').textContent='Sau RSE: chunk 5,6,7 nằm liền kề và đều liên quan → ghép thành Đoạn A (một mạch lý luận trọn vẹn). Chunk 11 đứng lẻ → giữ nguyên. LLM nhận 2 đoạn mạch lạc thay vì 4 mảnh rời.';
+  document.getElementById('rse-btn').disabled=true;
+});
+document.getElementById('rse-reset').addEventListener('click',()=>{
+  rseStrip(false);
+  document.getElementById('rse-seg').innerHTML='';
+  document.getElementById('rse-hint').textContent='Trước RSE: 4 chunk rời rạc (5, 6, 7, 11) được trả về như những mảnh độc lập.';
+  document.getElementById('rse-btn').disabled=false;
+});
+rseStrip(false);
+
+/* ---------- Compression ---------- */
+function cmpRender(on){
+  document.getElementById('cmp-doc').classList.toggle('compressed',on);
+  document.getElementById('cmp-tok').textContent=on?'~22':'~78';
+  document.getElementById('cmp-hint').textContent=on
+   ?'Sau nén: chỉ giữ câu trả lời thực sự — token giảm ~72%. Nhiều chunk gộp lại tiết kiệm rất lớn, và LLM tập trung hơn.'
+   :'Chunk gốc: phần lớn là văn xã giao, chỉ 1 câu trả lời thực sự.';
+}
+document.querySelectorAll('#cmp-demo .mode').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#cmp-demo .mode').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); cmpRender(b.dataset.cmp==='on');
+}));
+cmpRender(false);
+
+/* ---------- Augmentation ---------- */
+const AUGQ=[
+ {q:'Kết nối idle bị đóng sau bao lâu?',m:false},
+ {q:'Khi nhiều kết nối vượt ngưỡng thì hệ thống có mở thêm worker không?',m:true},
+ {q:'Pool quản lý vòng đời kết nối như thế nào?',m:false}
+];
+let augDone=false;
+document.getElementById('aug-btn').addEventListener('click',()=>{
+  if(augDone)return; augDone=true;
+  const ul=document.getElementById('aug-out'); ul.innerHTML='';
+  AUGQ.forEach((x,i)=>{
+    const li=document.createElement('li'); li.dataset.m=x.m;
+    li.innerHTML='<span class="tag">Q'+(i+1)+'</span>'+x.q;
+    ul.appendChild(li);
+  });
+  document.getElementById('aug-query').style.display='block';
+  setTimeout(()=>{
+    [...document.querySelectorAll('#aug-out li')].forEach(li=>{
+      if(li.dataset.m==='true')li.classList.add('match');
+    });
+    document.getElementById('aug-hint').innerHTML='Truy vấn của người dùng gần như trùng với câu hỏi sinh sẵn <b>Q2</b> (câu ↔ câu, khớp rất cao) → dẫn thẳng về chunk gốc. Nếu chỉ khớp truy vấn với thân chunk (văn trần thuật "cứ mỗi 5 kết nối vượt ngưỡng..."), điểm sẽ thấp hơn nhiều.';
+  },500);
+  document.getElementById('aug-btn').disabled=true;
+});
+document.getElementById('aug-reset').addEventListener('click',()=>{
+  augDone=false; document.getElementById('aug-out').innerHTML='';
+  document.getElementById('aug-query').style.display='none';
+  document.getElementById('aug-btn').disabled=false;
+});
+
+/* quizzes */
+document.querySelectorAll('.quiz').forEach(q=>{
+  const ans=+q.dataset.answer, opts=[...q.querySelectorAll('.opt')], expl=q.querySelector('.expl');
+  opts.forEach((o,i)=>o.addEventListener('click',()=>{
+    opts.forEach((x,j)=>{x.classList.remove('right','wrong'); if(j===ans)x.classList.add('right');});
+    if(i!==ans)o.classList.add('wrong');
+    expl.classList.add('show');
+  }));
+});
+</script>
+</body>
+</html>

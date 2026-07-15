@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vòng lặp & thích ứng: Feedback Loop, Adaptive Retrieval — Sổ tay RAG</title>
+<style>
+:root{
+  --bg:#F7F8FC; --surface:#FFFFFF; --ink:#16213A; --ink-soft:#4A5570;
+  --line:#DDE2EF; --primary:#3B4CC0; --primary-soft:#E8EBFA;
+  --amber:#B97C1D; --amber-soft:#FBF3E2; --teal:#1F8A70; --teal-soft:#E3F4EF;
+  --rose:#B0455A; --rose-soft:#F9E9ED;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+  --sans:"Be Vietnam Pro","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.7;font-size:16.5px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px}
+a{color:var(--primary)}
+#progress{position:fixed;top:0;left:0;height:3px;background:var(--rose);width:0;z-index:99}
+header{background:var(--ink);color:#EDF0FA;padding:44px 0 34px}
+.crumb{font-family:var(--mono);font-size:.78rem;color:#9FB0E8}
+.crumb a{color:#9FB0E8;text-decoration:none}
+.crumb a:hover{text-decoration:underline}
+header h1{font-size:clamp(1.7rem,4vw,2.4rem);font-weight:800;margin:.5rem 0;letter-spacing:-.02em;line-height:1.2}
+header p{color:#C3CCE8;max-width:660px}
+.rail-panel{background:#101830;padding:14px 0 20px}
+.rail-panel svg{display:block;margin:0 auto}
+nav.toc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:26px auto;max-width:860px}
+nav.toc b{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+nav.toc ol{margin:8px 0 0 20px}
+nav.toc li{padding:2px 0}
+section.tech{padding:36px 0 10px}
+.tech-head{border-left:5px solid var(--rose);padding-left:16px;margin-bottom:20px}
+.tech-head .kicker{font-family:var(--mono);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--rose)}
+.tech-head h2{font-size:1.7rem;font-weight:800}
+.badges{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.badge{font-family:var(--mono);font-size:.68rem;padding:2px 9px;border-radius:99px}
+.lv3{background:var(--rose-soft);color:var(--rose)}
+.stage{background:var(--primary-soft);color:var(--primary)}
+.stage-all{background:var(--amber-soft);color:var(--amber)}
+h3{font-size:1.12rem;font-weight:700;margin:28px 0 8px}
+p{margin-bottom:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0;overflow-x:auto}
+.problem{border-left:4px solid var(--rose);background:var(--rose-soft)}
+.insight{border-left:4px solid var(--teal);background:var(--teal-soft)}
+.problem b,.insight b{display:block;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.problem b{color:var(--rose)} .insight b{color:var(--teal)}
+pre{background:#101830;color:#D9E0F5;font-family:var(--mono);font-size:.82rem;line-height:1.6;padding:16px 18px;border-radius:12px;overflow-x:auto;margin:14px 0}
+pre .c{color:#7A88B8} pre .k{color:#FFC96B} pre .s{color:#8FD3B6}
+code{font-family:var(--mono);font-size:.85em;background:var(--primary-soft);color:var(--primary);padding:1px 6px;border-radius:5px}
+pre code{background:none;color:inherit;padding:0}
+.demo{background:var(--surface);border:2px solid var(--rose);border-radius:14px;padding:20px;margin:18px 0}
+.demo .demo-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--rose);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.demo .demo-tag::before{content:"▶";font-size:.6rem}
+.controls{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;align-items:center}
+button{font-family:var(--sans);font-size:.9rem;padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+button.primary{background:var(--rose);border-color:var(--rose);color:#fff;font-weight:600}
+button.primary:hover{background:#943A4C}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,select:focus-visible{outline:3px solid #9FB0E8;outline-offset:1px}
+select{font-family:var(--sans);font-size:.9rem;padding:8px 12px;border-radius:9px;border:1px solid var(--line);background:#fff}
+.hint{font-size:.84rem;color:var(--ink-soft);margin-top:8px}
+
+/* feedback demo */
+.fb-list{list-style:none;margin-top:12px}
+.fb-list li{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:center;border:1.5px solid var(--line);border-radius:9px;padding:9px 12px;margin-bottom:7px;background:var(--bg);font-size:.87rem;transition:all .45s}
+.fb-list li.up{border-color:var(--teal);background:var(--teal-soft)}
+.fb-list li.down{border-color:var(--rose);background:var(--rose-soft);opacity:.7}
+.fb-list .pos{font-family:var(--mono);font-weight:700;color:var(--ink-soft)}
+.fb-btns{display:flex;gap:5px}
+.fb-btns button{padding:4px 9px;font-size:.9rem;border-radius:7px;line-height:1}
+.fb-btns button.on-up{background:var(--teal-soft);border-color:var(--teal)}
+.fb-btns button.on-down{background:var(--rose-soft);border-color:var(--rose)}
+.round-tag{font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--rose);margin:14px 0 4px}
+
+/* adaptive demo */
+.adapt-type{display:inline-block;font-family:var(--mono);font-size:.78rem;padding:4px 12px;border-radius:99px;margin:8px 0}
+.at-fac{background:var(--primary-soft);color:var(--primary)}
+.at-ana{background:var(--amber-soft);color:var(--amber)}
+.at-opi{background:var(--rose-soft);color:var(--rose)}
+.at-ctx{background:var(--teal-soft);color:var(--teal)}
+.strat-card{border:1.5px solid var(--line);border-radius:11px;padding:14px 16px;margin-top:10px;background:var(--bg)}
+.strat-card h4{font-size:.95rem;margin-bottom:8px}
+.strat-row{display:grid;grid-template-columns:130px 1fr;gap:8px;font-size:.86rem;padding:5px 0;border-bottom:1px dashed var(--line)}
+.strat-row:last-child{border-bottom:none}
+.strat-row .k{font-family:var(--mono);font-size:.76rem;color:var(--ink-soft)}
+
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.duo .col{border-radius:12px;padding:16px 18px}
+.duo .yes{background:var(--teal-soft);border:1px solid #BADFD2}
+.duo .no{background:var(--rose-soft);border:1px solid #EBC6CE}
+.duo h4{font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.duo .yes h4{color:var(--teal)} .duo .no h4{color:var(--rose)}
+.duo ul{margin-left:18px;font-size:.9rem}
+.duo li{margin-bottom:6px}
+@media (max-width:620px){.duo{grid-template-columns:1fr}}
+.quiz{background:var(--amber-soft);border:1px solid #EAD9B4;border-radius:14px;padding:20px;margin:20px 0}
+.quiz .q-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:8px}
+.quiz p.q{font-weight:600;margin-bottom:10px}
+.quiz .opts{display:flex;flex-direction:column;gap:8px}
+.quiz .opt{text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:9px 13px;font-size:.92rem;cursor:pointer}
+.quiz .opt:hover{border-color:var(--amber)}
+.quiz .opt.right{border-color:var(--teal);background:var(--teal-soft)}
+.quiz .opt.wrong{border-color:var(--rose);background:var(--rose-soft)}
+.quiz .expl{display:none;margin-top:10px;font-size:.88rem;background:#fff;border-radius:9px;padding:10px 13px}
+.quiz .expl.show{display:block}
+table{width:100%;border-collapse:collapse;background:var(--surface);font-size:.88rem}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--ink);color:#EDF0FA;font-size:.76rem;text-transform:uppercase;letter-spacing:.05em}
+.table-scroll{overflow-x:auto;border-radius:12px;border:1px solid var(--line);margin:14px 0}
+.summary{background:var(--ink);color:#D9E0F5;border-radius:14px;padding:24px;margin:30px 0}
+.summary h3{color:#FFC96B;margin-top:0}
+.summary ul{margin-left:20px}
+.summary li{margin-bottom:8px}
+.nav-next{display:flex;justify-content:space-between;gap:12px;padding:10px 0 50px;flex-wrap:wrap}
+.nav-next a{text-decoration:none;font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 18px}
+.nav-next a:hover{border-color:var(--primary)}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<header>
+  <div class="wrap">
+    <div class="crumb"><a href="index.html">← Trang tổng quan</a> · Nhóm Vòng lặp & thích ứng · Batch 5</div>
+    <h1>Vòng lặp & thích ứng — hệ RAG tự điều chỉnh</h1>
+    <p>Đến giờ mọi kỹ thuật đều xử lý truy vấn theo <b>một chiến lược cố định</b>. Hai kỹ thuật này phá vỡ điều đó: một cái <b>học từ phản hồi</b> để tốt lên theo thời gian, một cái <b>đổi chiến lược ngay tại chỗ</b> tùy loại câu hỏi. Đây là cầu nối sang tư duy agentic ở nhóm sau.</p>
+  </div>
+</header>
+
+<div class="rail-panel">
+  <svg viewBox="0 0 760 60" width="100%" style="max-width:820px" role="img" aria-label="Nhóm vòng lặp bao trùm nhiều giai đoạn có phản hồi ngược">
+    <line x1="20" y1="30" x2="740" y2="30" stroke="#2A3560" stroke-width="2"/>
+    <g font-size="11" text-anchor="middle">
+      <circle cx="80" cy="30" r="7" fill="#2A3560"/><text x="80" y="52" fill="#6C7BB0">Lập chỉ mục</text>
+      <circle cx="240" cy="30" r="10" fill="#FFC96B"/><text x="240" y="52" fill="#FFC96B" font-weight="700">Truy vấn ◀</text>
+      <circle cx="400" cy="30" r="10" fill="#FFC96B"/><text x="400" y="52" fill="#FFC96B" font-weight="700">Truy xuất ◀</text>
+      <circle cx="560" cy="30" r="7" fill="#2A3560"/><text x="560" y="52" fill="#6C7BB0">Hậu xử lý</text>
+      <circle cx="700" cy="30" r="10" fill="#FFC96B"/><text x="700" y="52" fill="#FFC96B" font-weight="700">Sinh ◀</text>
+    </g>
+    <path d="M700 18 C 620 -2, 320 -2, 240 18" fill="none" stroke="#B0455A" stroke-width="1.6" stroke-dasharray="5 4"/>
+    <text x="470" y="8" text-anchor="middle" font-size="10.5" fill="#B0455A">vòng phản hồi ngược</text>
+  </svg>
+</div>
+
+<nav class="toc wrap">
+  <b>Trong bài này</b>
+  <ol>
+    <li><a href="#feedback">Retrieval with Feedback Loop</a> — học từ phản hồi người dùng</li>
+    <li><a href="#adaptive">Adaptive Retrieval</a> — phân loại câu hỏi, đổi chiến lược</li>
+    <li><a href="#compare">Tổng kết & bước tiếp</a></li>
+  </ol>
+</nav>
+
+<!-- ================= FEEDBACK LOOP ================= -->
+<section class="tech" id="feedback">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 1/2</div>
+      <h2>Retrieval with Feedback Loop</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage-all">Có phản hồi ngược</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Một hệ RAG "đóng băng" sau khi triển khai: nó không biết câu trả lời nào hữu ích, tài liệu nào người dùng thấy vô dụng. Cùng một truy vấn tồi lặp lại mãi vẫn cho kết quả tồi như cũ — hệ thống không học được gì từ hàng nghìn lượt tương tác thực tế.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Thu thập <b>phản hồi</b> (người dùng thấy tài liệu/câu trả lời có hữu ích không), lưu lại, và dùng nó để <b>điều chỉnh truy xuất về sau</b>: tài liệu từng được đánh giá tốt cho truy vấn tương tự sẽ được nâng điểm, tài liệu bị chê sẽ bị hạ. Hệ thống tốt dần theo thời gian mà không cần huấn luyện lại từ đầu.
+    </div>
+
+    <div class="demo" id="fb-demo">
+      <div class="demo-tag">Demo mô phỏng — dạy hệ thống qua phản hồi</div>
+      <p style="font-size:.9rem">Truy vấn: <span style="font-family:var(--mono);background:var(--rose-soft);color:var(--rose);padding:1px 7px;border-radius:6px">"cách tăng giới hạn upload file?"</span>. Đánh giá 👍/👎 cho từng kết quả, rồi chạy lại truy vấn tương tự để xem thứ hạng thay đổi.</p>
+      <div class="round-tag">Lượt 1 — kết quả ban đầu (hãy đánh giá)</div>
+      <ul class="fb-list" id="fb-list"></ul>
+      <div class="controls">
+        <button class="primary" id="fb-run" disabled>Chạy lại truy vấn tương tự ▸</button>
+        <button id="fb-reset">↺ Làm lại</button>
+      </div>
+      <div id="fb-round2"></div>
+      <div class="hint" id="fb-hint">Gợi ý: đánh giá 👎 cho các kết quả lạc đề (giới hạn API gateway, định dạng file) và 👍 cho kết quả đúng (cấu hình giới hạn, upload theo chunk).</div>
+    </div>
+
+<pre><code><span class="c"># Lưu phản hồi cho từng cặp (truy vấn, tài liệu)</span>
+feedback_store.record(query, doc_id, useful=<span class="k">True</span>/<span class="k">False</span>)
+
+<span class="c"># Lần tìm sau: cộng/trừ điểm theo lịch sử phản hồi của truy vấn tương tự</span>
+<span class="k">def</span> adjusted_score(doc, query):
+    base = similarity(doc, query)
+    boost = feedback_store.signal(doc, similar_to=query)  <span class="c"># +/- theo 👍/👎</span>
+    <span class="k">return</span> base + beta * boost</code></pre>
+
+    <div class="quiz" data-answer="1">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Rủi ro chính khi để phản hồi người dùng điều khiển truy xuất là gì?</p>
+      <div class="opts">
+        <button class="opt">Phản hồi làm chậm hệ thống</button>
+        <button class="opt">Vòng phản hồi có thể tạo "buồng vọng": tài liệu phổ biến càng được đẩy lên, tài liệu đúng nhưng ít lượt xem bị chôn vùi — cần cân bằng khám phá vs khai thác</button>
+        <button class="opt">Không có rủi ro nào</button>
+      </div>
+      <div class="expl">Đây là bài toán khám phá–khai thác (explore–exploit) kinh điển: nếu chỉ đẩy cái từng được thích, hệ thống thành buồng vọng, không bao giờ cho tài liệu mới cơ hội. Ngoài ra phản hồi thưa và nhiễu (người dùng bấm bừa) có thể dạy sai. Feedback loop mạnh nhưng cần thiết kế cẩn thận để không tự đầu độc.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ADAPTIVE ================= -->
+<section class="tech" id="adaptive">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 2/2</div>
+      <h2>Adaptive Retrieval</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage">Truy vấn + Truy xuất</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Không phải câu hỏi nào cũng nên xử lý giống nhau. "Điều 5 quy định gì?" (tra cứu chính xác) và "Vì sao chính sách này gây tranh cãi?" (phân tích, cần nhiều góc nhìn) đòi hỏi <i>chiến lược truy xuất khác hẳn</i>. Một chiến lược cố định sẽ tối ưu cho loại này nhưng dở với loại kia.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      <b>Phân loại truy vấn trước</b>, rồi chọn chiến lược truy xuất phù hợp cho từng loại. Repo gốc chia câu hỏi thành các nhóm như Factual (tra cứu sự thật), Analytical (phân tích), Opinion (quan điểm), Contextual (phụ thuộc ngữ cảnh người dùng) — mỗi nhóm có cách truy xuất riêng.
+    </div>
+
+    <div class="demo" id="adapt-demo">
+      <div class="demo-tag">Demo mô phỏng — chọn câu hỏi, xem chiến lược thích ứng</div>
+      <div class="controls">
+        <label style="font-size:.88rem">Chọn câu hỏi mẫu:
+          <select id="adapt-q">
+            <option value="fac">"Timeout mặc định của connection pool là bao nhiêu?"</option>
+            <option value="ana">"Vì sao connection pool size lớn không phải lúc nào cũng nhanh hơn?"</option>
+            <option value="opi">"Có nên chuyển từ REST sang GraphQL không?"</option>
+            <option value="ctx">"Với hệ thống của tôi thì nên cấu hình thế nào?"</option>
+          </select>
+        </label>
+      </div>
+      <div id="adapt-type-wrap"></div>
+      <div class="strat-card" id="adapt-strat"></div>
+    </div>
+
+    <div class="duo">
+      <div class="col yes"><h4>Nên dùng khi</h4><ul>
+        <li>Câu hỏi đầu vào rất đa dạng về bản chất (chatbot tổng hợp nhiều loại nhu cầu).</li>
+        <li>Đã có sẵn nhiều chiến lược truy xuất (Fusion, HyDE, decompose...) và muốn dùng đúng chỗ.</li>
+        <li>Một chiến lược cố định đang "được cái này mất cái kia".</li>
+      </ul></div>
+      <div class="col no"><h4>Không nên / lưu ý</h4><ul>
+        <li>Câu hỏi khá đồng nhất về loại — thêm bước phân loại chỉ tốn latency vô ích.</li>
+        <li>Bộ phân loại sai → chọn nhầm chiến lược, có thể tệ hơn dùng một chiến lược ổn định.</li>
+        <li>Thêm một điểm cần bảo trì và đánh giá (chất lượng phân loại).</li>
+      </ul></div>
+    </div>
+
+    <div class="quiz" data-answer="2">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Adaptive Retrieval là "bản lề" dẫn sang nhóm kiến trúc agentic. Vì sao?</p>
+      <div class="opts">
+        <button class="opt">Vì nó dùng nhiều token hơn</button>
+        <button class="opt">Vì nó cần GPU mạnh hơn</button>
+        <button class="opt">Vì nó đưa vào bước "hệ thống tự quyết định làm gì tiếp theo" (định tuyến) — hạt nhân của tư duy agent: quan sát → quyết định → hành động</button>
+      </div>
+      <div class="expl">Cho tới đây, pipeline chạy tuyến tính cố định. Adaptive Retrieval thêm một <b>điểm ra quyết định</b>: hệ thống phân loại rồi tự chọn nhánh xử lý. Đây chính là mầm mống của agent — Self-RAG, CRAG, Agentic RAG (nhóm sau) mở rộng ý này thành nhiều bước quyết định lồng nhau: có nên truy xuất không, kết quả đủ tốt chưa, cần tìm lại không.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPARE ================= -->
+<section class="tech" id="compare">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Tổng kết nhóm</div>
+      <h2>So sánh & vị trí trong bức tranh lớn</h2>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Kỹ thuật</th><th>Học/quyết định khi nào</th><th>Cải thiện theo</th><th>Trường hợp phù hợp nhất</th></tr></thead>
+      <tbody>
+        <tr><td><b>Feedback Loop</b></td><td>Qua thời gian, từ nhiều lượt dùng</td><td>Tích lũy phản hồi thực tế</td><td>Sản phẩm có lượng người dùng lớn, phản hồi dồi dào</td></tr>
+        <tr><td><b>Adaptive Retrieval</b></td><td>Ngay tại chỗ, mỗi truy vấn</td><td>Khớp chiến lược với loại câu hỏi</td><td>Đầu vào đa dạng về bản chất câu hỏi</td></tr>
+      </tbody>
+    </table></div>
+    <p>Hai kỹ thuật này bổ sung nhau theo hai trục thời gian: Feedback Loop cải thiện <b>giữa các phiên</b> (dài hạn), Adaptive Retrieval tối ưu <b>trong một phiên</b> (tức thời). Kết hợp cả hai: phân loại để chọn chiến lược đúng, rồi dùng phản hồi để tinh chỉnh chính bộ phân loại và bảng xếp hạng theo thời gian.</p>
+
+    <div class="summary">
+      <h3>Ghi nhớ 4 điều</h3>
+      <ul>
+        <li>Cả hai phá vỡ giả định "một chiến lược cho mọi truy vấn" — nhưng theo hai cách: học dài hạn (Feedback) vs định tuyến tức thời (Adaptive).</li>
+        <li>Feedback Loop mạnh nhưng dễ tạo buồng vọng — luôn cân bằng khám phá vs khai thác, đề phòng phản hồi nhiễu.</li>
+        <li>Adaptive Retrieval = phân loại + chọn nhánh; giá trị phụ thuộc chất lượng bộ phân loại.</li>
+        <li>Adaptive là bản lề dẫn sang <b>agentic RAG</b>: điểm ra quyết định đầu tiên trong pipeline, hạt nhân của Self-RAG / CRAG ở nhóm tiếp theo.</li>
+      </ul>
+    </div>
+
+    <div class="nav-next">
+      <a href="05-advanced-retrieval.html">← Xem lại: Truy xuất nâng cao</a>
+      <a href="index.html">Trang tổng quan →</a>
+    </div>
+    <p style="font-size:.85rem;color:var(--ink-soft)">Batch 5 hoàn tất nhóm Vòng lặp & thích ứng (21/35 kỹ thuật). Batch tiếp theo là nhóm lớn nhất: Kiến trúc nâng cao (RAPTOR, Self-RAG, CRAG, GraphRAG, Agentic RAG, MemoRAG...).</p>
+  </div>
+</section>
+
+<script>
+/* progress */
+addEventListener('scroll',()=>{
+  const h=document.documentElement;
+  document.getElementById('progress').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';
+},{passive:true});
+
+/* ---------- Feedback loop ---------- */
+const FBDOCS=[
+ {id:0,t:'Cấu hình giới hạn upload: tham số & cách thay đổi',good:true},
+ {id:1,t:'Giới hạn kích thước request của API gateway',good:false},
+ {id:2,t:'Upload file lớn theo chunk: hướng dẫn & ví dụ',good:true},
+ {id:3,t:'Danh sách định dạng file được hỗ trợ',good:false}
+];
+let fbVotes={}; // id -> 'up'|'down'
+function fbRenderRound1(){
+  const ul=document.getElementById('fb-list'); ul.innerHTML='';
+  FBDOCS.forEach((d,i)=>{
+    const li=document.createElement('li');
+    const v=fbVotes[d.id];
+    if(v==='up')li.className='up'; else if(v==='down')li.className='down';
+    li.innerHTML='<span class="pos">'+(i+1)+'</span><span>'+d.t+'</span>'
+      +'<span class="fb-btns"><button data-id="'+d.id+'" data-v="up" class="'+(v==='up'?'on-up':'')+'">👍</button>'
+      +'<button data-id="'+d.id+'" data-v="down" class="'+(v==='down'?'on-down':'')+'">👎</button></span>';
+    ul.appendChild(li);
+  });
+  ul.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+    const id=+b.dataset.id;
+    fbVotes[id]=(fbVotes[id]===b.dataset.v)?undefined:b.dataset.v;
+    fbRenderRound1();
+    document.getElementById('fb-run').disabled=Object.values(fbVotes).filter(Boolean).length===0;
+  }));
+}
+document.getElementById('fb-run').addEventListener('click',()=>{
+  // reorder: up first (by original), then neutral, then down
+  const rank=FBDOCS.map(d=>({...d,v:fbVotes[d.id]}));
+  rank.sort((a,b)=>{
+    const w=x=>x.v==='up'?0:x.v==='down'?2:1;
+    return w(a)-w(b);
+  });
+  const box=document.getElementById('fb-round2'); box.innerHTML='';
+  const tag=document.createElement('div'); tag.className='round-tag'; tag.textContent='Lượt 2 — sau khi học phản hồi'; box.appendChild(tag);
+  const ul=document.createElement('ul'); ul.className='fb-list';
+  rank.forEach((d,i)=>{
+    const li=document.createElement('li');
+    if(d.v==='up')li.className='up'; else if(d.v==='down')li.className='down';
+    li.innerHTML='<span class="pos">'+(i+1)+'</span><span>'+d.t+'</span><span style="font-family:var(--mono);font-size:.72rem;color:var(--ink-soft)">'+(d.v==='up'?'▲ nâng':d.v==='down'?'▼ hạ':'—')+'</span>';
+    ul.appendChild(li);
+  });
+  box.appendChild(ul);
+  document.getElementById('fb-hint').innerHTML='Truy vấn tương tự lần sau: tài liệu bạn đánh 👍 được nâng lên đầu, 👎 bị đẩy xuống. Phản hồi được lưu theo cặp (truy vấn, tài liệu) nên áp dụng cho cả các truy vấn <i>gần giống</i>, không chỉ truy vấn y hệt.';
+  document.getElementById('fb-run').disabled=true;
+});
+document.getElementById('fb-reset').addEventListener('click',()=>{
+  fbVotes={}; document.getElementById('fb-round2').innerHTML='';
+  document.getElementById('fb-run').disabled=true;
+  document.getElementById('fb-hint').innerHTML='Gợi ý: đánh giá 👎 cho các kết quả lạc đề (giới hạn API gateway, định dạng file) và 👍 cho kết quả đúng (cấu hình giới hạn, upload theo chunk).';
+  fbRenderRound1();
+});
+fbRenderRound1();
+
+/* ---------- Adaptive ---------- */
+const ADAPT={
+ fac:{type:'Factual — tra cứu sự thật',cls:'at-fac',
+   rows:[['Chiến lược','Truy xuất chính xác, một lần'],['Số kết quả (k)','Nhỏ (3–5) — cần đúng, không cần rộng'],['Biến đổi truy vấn','Rewrite nhẹ để chuẩn hóa'],['Ưu tiên','Độ chính xác & tính chính thức của nguồn']]},
+ ana:{type:'Analytical — phân tích',cls:'at-ana',
+   rows:[['Chiến lược','Decompose thành câu hỏi con + truy xuất rộng'],['Số kết quả (k)','Lớn (10–15) — cần nhiều khía cạnh'],['Biến đổi truy vấn','Sub-query decomposition'],['Ưu tiên','Độ bao phủ nhiều mặt của vấn đề']]},
+ opi:{type:'Opinion — quan điểm',cls:'at-opi',
+   rows:[['Chiến lược','Truy xuất đa dạng góc nhìn'],['Số kết quả (k)','Vừa, ưu tiên đa dạng (Dartboard)'],['Biến đổi truy vấn','Tìm cả ý ủng hộ lẫn phản đối'],['Ưu tiên','Cân bằng, tránh thiên lệch một phía']]},
+ ctx:{type:'Contextual — phụ thuộc ngữ cảnh',cls:'at-ctx',
+   rows:[['Chiến lược','Ghép ngữ cảnh người dùng vào truy vấn'],['Số kết quả (k)','Vừa, lọc theo hồ sơ người dùng'],['Biến đổi truy vấn','Bổ sung thông tin ẩn ("hệ thống của tôi" → phiên bản, tải, hạ tầng)'],['Ưu tiên','Cá nhân hóa theo tình huống cụ thể']]}
+};
+function adaptRender(){
+  const k=document.getElementById('adapt-q').value, d=ADAPT[k];
+  document.getElementById('adapt-type-wrap').innerHTML='<span class="adapt-type '+d.cls+'">Phân loại → '+d.type+'</span>';
+  let html='<h4>Chiến lược truy xuất được chọn</h4>';
+  d.rows.forEach(r=>html+='<div class="strat-row"><span class="k">'+r[0]+'</span><span>'+r[1]+'</span></div>');
+  document.getElementById('adapt-strat').innerHTML=html;
+}
+document.getElementById('adapt-q').addEventListener('change',adaptRender);
+adaptRender();
+
+/* quizzes */
+document.querySelectorAll('.quiz').forEach(q=>{
+  const ans=+q.dataset.answer, opts=[...q.querySelectorAll('.opt')], expl=q.querySelector('.expl');
+  opts.forEach((o,i)=>o.addEventListener('click',()=>{
+    opts.forEach((x,j)=>{x.classList.remove('right','wrong'); if(j===ans)x.classList.add('right');});
+    if(i!==ans)o.classList.add('wrong');
+    expl.classList.add('show');
+  }));
+});
+</script>
+</body>
+</html>

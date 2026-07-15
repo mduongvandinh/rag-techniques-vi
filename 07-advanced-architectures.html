@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kiến trúc nâng cao: RAPTOR, GraphRAG, Self-RAG, CRAG, Agentic — Sổ tay RAG</title>
+<style>
+:root{
+  --bg:#F7F8FC; --surface:#FFFFFF; --ink:#16213A; --ink-soft:#4A5570;
+  --line:#DDE2EF; --primary:#3B4CC0; --primary-soft:#E8EBFA;
+  --amber:#B97C1D; --amber-soft:#FBF3E2; --teal:#1F8A70; --teal-soft:#E3F4EF;
+  --rose:#B0455A; --rose-soft:#F9E9ED; --violet:#6B4BA8; --violet-soft:#EFE9F8;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+  --sans:"Be Vietnam Pro","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.7;font-size:16.5px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px}
+a{color:var(--primary)}
+#progress{position:fixed;top:0;left:0;height:3px;background:var(--violet);width:0;z-index:99}
+header{background:var(--ink);color:#EDF0FA;padding:44px 0 34px}
+.crumb{font-family:var(--mono);font-size:.78rem;color:#9FB0E8}
+.crumb a{color:#9FB0E8;text-decoration:none}
+.crumb a:hover{text-decoration:underline}
+header h1{font-size:clamp(1.7rem,4vw,2.4rem);font-weight:800;margin:.5rem 0;letter-spacing:-.02em;line-height:1.2}
+header p{color:#C3CCE8;max-width:660px}
+.rail-panel{background:#101830;padding:14px 0 20px}
+.rail-panel svg{display:block;margin:0 auto}
+nav.toc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:26px auto;max-width:860px}
+nav.toc b{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+nav.toc ol{margin:8px 0 0 20px}
+nav.toc li{padding:2px 0}
+.fam{font-family:var(--mono);font-size:.72rem;color:var(--ink-soft)}
+section.tech{padding:36px 0 10px}
+.tech-head{border-left:5px solid var(--violet);padding-left:16px;margin-bottom:20px}
+.tech-head .kicker{font-family:var(--mono);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--violet)}
+.tech-head h2{font-size:1.7rem;font-weight:800}
+.badges{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.badge{font-family:var(--mono);font-size:.68rem;padding:2px 9px;border-radius:99px}
+.lv3{background:var(--rose-soft);color:var(--rose)}
+.stage{background:var(--primary-soft);color:var(--primary)}
+.stage-idx{background:var(--teal-soft);color:var(--teal)}
+.stage-all{background:var(--violet-soft);color:var(--violet)}
+h3{font-size:1.12rem;font-weight:700;margin:28px 0 8px}
+p{margin-bottom:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0;overflow-x:auto}
+.problem{border-left:4px solid var(--rose);background:var(--rose-soft)}
+.insight{border-left:4px solid var(--teal);background:var(--teal-soft)}
+.problem b,.insight b{display:block;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.problem b{color:var(--rose)} .insight b{color:var(--teal)}
+pre{background:#101830;color:#D9E0F5;font-family:var(--mono);font-size:.82rem;line-height:1.6;padding:16px 18px;border-radius:12px;overflow-x:auto;margin:14px 0}
+pre .c{color:#7A88B8} pre .k{color:#FFC96B} pre .s{color:#8FD3B6}
+code{font-family:var(--mono);font-size:.85em;background:var(--primary-soft);color:var(--primary);padding:1px 6px;border-radius:5px}
+pre code{background:none;color:inherit;padding:0}
+.demo{background:var(--surface);border:2px solid var(--violet);border-radius:14px;padding:20px;margin:18px 0}
+.demo .demo-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--violet);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.demo .demo-tag::before{content:"▶";font-size:.6rem}
+.controls{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;align-items:center}
+button{font-family:var(--sans);font-size:.9rem;padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+button.primary{background:var(--violet);border-color:var(--violet);color:#fff;font-weight:600}
+button.primary:hover{background:#573C8B}
+button.mode{border:1.5px solid var(--line)}
+button.mode.on{border-color:var(--violet);background:var(--violet-soft);color:var(--violet);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,select:focus-visible{outline:3px solid #9FB0E8;outline-offset:1px}
+select{font-family:var(--sans);font-size:.9rem;padding:8px 12px;border-radius:9px;border:1px solid var(--line);background:#fff}
+.hint{font-size:.84rem;color:var(--ink-soft);margin-top:8px}
+.qtag{font-family:var(--mono);font-size:.8rem;background:var(--violet-soft);color:var(--violet);padding:2px 8px;border-radius:6px}
+.tree-node{transition:opacity .5s}
+.g-edge{transition:stroke .4s, stroke-width .4s, opacity .4s}
+.g-edge.lit{stroke:#6B4BA8;stroke-width:3;opacity:1}
+.g-edge.dim{opacity:.18}
+.hop-log{list-style:none;margin-top:10px}
+.hop-log li{font-size:.85rem;padding:7px 11px;border-left:3px solid var(--violet);background:var(--violet-soft);border-radius:0 8px 8px 0;margin-bottom:6px;opacity:0;transform:translateX(-6px);transition:opacity .4s, transform .4s}
+.hop-log li.show{opacity:1;transform:none}
+.flow-steps{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.fstep{display:grid;grid-template-columns:30px 1fr;gap:11px;align-items:start;border:1.5px solid var(--line);border-radius:10px;padding:10px 13px;background:var(--bg);font-size:.87rem;opacity:.4;transition:opacity .4s, border-color .4s, background .4s}
+.fstep.on{opacity:1;border-color:var(--violet);background:var(--violet-soft)}
+.fstep.ok{opacity:1;border-color:var(--teal);background:var(--teal-soft)}
+.fstep.no{opacity:1;border-color:var(--rose);background:var(--rose-soft)}
+.fstep .n{font-family:var(--mono);font-weight:700;font-size:.78rem;color:var(--violet);padding-top:2px}
+.fstep.ok .n{color:var(--teal)} .fstep.no .n{color:var(--rose)}
+.fstep .body b{display:block;margin-bottom:2px}
+.fstep .body span{color:var(--ink-soft);font-size:.84rem}
+.verdict-pill{display:inline-block;font-family:var(--mono);font-size:.72rem;padding:2px 9px;border-radius:99px;margin-top:5px}
+.vp-ok{background:var(--teal-soft);color:var(--teal)} .vp-no{background:var(--rose-soft);color:var(--rose)}
+.vp-mid{background:var(--amber-soft);color:var(--amber)}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.duo .col{border-radius:12px;padding:16px 18px}
+.duo .yes{background:var(--teal-soft);border:1px solid #BADFD2}
+.duo .no{background:var(--rose-soft);border:1px solid #EBC6CE}
+.duo h4{font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.duo .yes h4{color:var(--teal)} .duo .no h4{color:var(--rose)}
+.duo ul{margin-left:18px;font-size:.9rem}
+.duo li{margin-bottom:6px}
+@media (max-width:620px){.duo{grid-template-columns:1fr}}
+.quiz{background:var(--amber-soft);border:1px solid #EAD9B4;border-radius:14px;padding:20px;margin:20px 0}
+.quiz .q-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:8px}
+.quiz p.q{font-weight:600;margin-bottom:10px}
+.quiz .opts{display:flex;flex-direction:column;gap:8px}
+.quiz .opt{text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:9px 13px;font-size:.92rem;cursor:pointer}
+.quiz .opt:hover{border-color:var(--amber)}
+.quiz .opt.right{border-color:var(--teal);background:var(--teal-soft)}
+.quiz .opt.wrong{border-color:var(--rose);background:var(--rose-soft)}
+.quiz .expl{display:none;margin-top:10px;font-size:.88rem;background:#fff;border-radius:9px;padding:10px 13px}
+.quiz .expl.show{display:block}
+table{width:100%;border-collapse:collapse;background:var(--surface);font-size:.88rem}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--ink);color:#EDF0FA;font-size:.76rem;text-transform:uppercase;letter-spacing:.05em}
+.table-scroll{overflow-x:auto;border-radius:12px;border:1px solid var(--line);margin:14px 0}
+.summary{background:var(--ink);color:#D9E0F5;border-radius:14px;padding:24px;margin:30px 0}
+.summary h3{color:#FFC96B;margin-top:0}
+.summary ul{margin-left:20px}
+.summary li{margin-bottom:8px}
+.nav-next{display:flex;justify-content:space-between;gap:12px;padding:10px 0 50px;flex-wrap:wrap}
+.nav-next a{text-decoration:none;font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 18px}
+.nav-next a:hover{border-color:var(--primary)}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<header>
+  <div class="wrap">
+    <div class="crumb"><a href="index.html">← Trang tổng quan</a> · Nhóm Kiến trúc nâng cao · Batch 6</div>
+    <h1>Kiến trúc nâng cao — khi RAG không còn là đường thẳng</h1>
+    <p>Tám kiến trúc thay đổi <b>hình dạng</b> của pipeline: dựng cây tóm tắt (RAPTOR), đi theo quan hệ thực thể (GraphRAG), hay thêm vòng lặp tự đánh giá để hệ thống <b>tự quyết định</b> khi nào truy xuất, khi nào tìm lại, khi nào bỏ cuộc (Self-RAG, CRAG, Agentic).</p>
+  </div>
+</header>
+
+<div class="rail-panel">
+  <svg viewBox="0 0 760 62" width="100%" style="max-width:820px" role="img" aria-label="Kiến trúc nâng cao tái cấu trúc toàn pipeline với vòng lặp">
+    <line x1="20" y1="34" x2="740" y2="34" stroke="#2A3560" stroke-width="2"/>
+    <g font-size="11" text-anchor="middle">
+      <circle cx="80" cy="34" r="10" fill="#FFC96B"/><text x="80" y="56" fill="#FFC96B" font-weight="700">Lập chỉ mục</text>
+      <circle cx="240" cy="34" r="10" fill="#FFC96B"/><text x="240" y="56" fill="#FFC96B" font-weight="700">Truy vấn</text>
+      <circle cx="400" cy="34" r="10" fill="#FFC96B"/><text x="400" y="56" fill="#FFC96B" font-weight="700">Truy xuất</text>
+      <circle cx="560" cy="34" r="10" fill="#FFC96B"/><text x="560" y="56" fill="#FFC96B" font-weight="700">Hậu xử lý</text>
+      <circle cx="700" cy="34" r="10" fill="#FFC96B"/><text x="700" y="56" fill="#FFC96B" font-weight="700">Sinh</text>
+    </g>
+    <path d="M700 20 C 620 -4, 320 -4, 240 20" fill="none" stroke="#9B7FD4" stroke-width="1.8" stroke-dasharray="5 4"/>
+    <path d="M560 22 C 510 4, 450 4, 400 22" fill="none" stroke="#9B7FD4" stroke-width="1.8" stroke-dasharray="5 4"/>
+    <text x="470" y="10" text-anchor="middle" font-size="10.5" fill="#9B7FD4">nhiều vòng lặp quyết định lồng nhau</text>
+  </svg>
+</div>
+
+<nav class="toc wrap">
+  <b>Trong bài này</b>
+  <ol>
+    <li><a href="#raptor">RAPTOR</a> — cây tóm tắt đệ quy <span class="fam">· họ: cấu trúc index</span></li>
+    <li><a href="#graphrag">Graph RAG</a> — truy xuất theo quan hệ <span class="fam">· họ: cấu trúc index</span></li>
+    <li><a href="#msgraph">Microsoft GraphRAG</a> — cộng đồng & tóm tắt toàn cục <span class="fam">· họ: cấu trúc index</span></li>
+    <li><a href="#selfrag">Self-RAG</a> — tự quyết định khi nào truy xuất <span class="fam">· họ: vòng lặp tự đánh giá</span></li>
+    <li><a href="#crag">Corrective RAG (CRAG)</a> — tự sửa khi truy xuất kém <span class="fam">· họ: vòng lặp tự đánh giá</span></li>
+    <li><a href="#agentic">Agentic RAG</a> · <a href="#memorag">MemoRAG</a> · <a href="#controllable">Controllable RAG Agent</a></li>
+    <li><a href="#compare">Tổng kết & bước tiếp</a></li>
+  </ol>
+</nav>
+
+<!-- RAPTOR -->
+<section class="tech" id="raptor">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 1/8 · Họ cấu trúc index</div>
+      <h2>RAPTOR — cây tóm tắt đệ quy</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage-idx">Index + Truy xuất</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Chunk phẳng chỉ trả lời được câu hỏi <i>cục bộ</i> ("Mục 5 nói gì?"). Câu hỏi <b>toàn cục</b> — "chủ đề xuyên suốt bộ tài liệu là gì?", "tài liệu này lập luận theo hướng nào?" — không có chunk nào chứa câu trả lời, vì câu trả lời chỉ tồn tại khi <i>tổng hợp toàn bộ</i>. Hierarchical Indices (Batch 4) chỉ có 2 tầng, vẫn chưa đủ cho tổng hợp nhiều lớp.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi — dựng cây từ dưới lên</b>
+      Gom cụm các chunk giống nhau → dùng LLM <b>tóm tắt mỗi cụm</b> → coi các bản tóm tắt như "chunk mới" → lặp lại việc gom cụm và tóm tắt, cho tới khi còn một nút gốc. Kết quả là <b>cây nhiều tầng trừu tượng</b>. Lập chỉ mục <i>tất cả</i> các tầng — truy vấn chi tiết khớp lá, truy vấn tổng hợp khớp nút cao.
+    </div>
+
+    <div class="demo" id="rap-demo">
+      <div class="demo-tag">Demo mô phỏng — cây RAPTOR & hai loại truy vấn</div>
+      <div class="controls">
+        <label style="font-size:.88rem">Chọn truy vấn:
+          <select id="rap-q">
+            <option value="local">"Timeout mặc định là bao nhiêu ms?" (chi tiết)</option>
+            <option value="global">"Toàn bộ bộ tài liệu này nói về chủ đề gì?" (tổng hợp)</option>
+          </select>
+        </label>
+      </div>
+      <svg viewBox="0 0 780 250" width="100%" style="min-width:640px" role="img" aria-label="Cây RAPTOR ba tầng">
+        <g stroke="#DDE2EF" stroke-width="1.6">
+          <line x1="390" y1="52" x2="200" y2="112"/><line x1="390" y1="52" x2="580" y2="112"/>
+          <line x1="200" y1="112" x2="90" y2="182"/><line x1="200" y1="112" x2="200" y2="182"/><line x1="200" y1="112" x2="310" y2="182"/>
+          <line x1="580" y1="112" x2="470" y2="182"/><line x1="580" y1="112" x2="580" y2="182"/><line x1="580" y1="112" x2="690" y2="182"/>
+        </g>
+        <text x="14" y="46" font-size="10.5" font-family="monospace" fill="#4A5570">Tầng 3</text>
+        <text x="14" y="106" font-size="10.5" font-family="monospace" fill="#4A5570">Tầng 2</text>
+        <text x="14" y="176" font-size="10.5" font-family="monospace" fill="#4A5570">Tầng 1</text>
+        <g class="tree-node" id="g-n3">
+          <rect x="300" y="30" width="180" height="42" rx="9" fill="#EFE9F8" stroke="#6B4BA8" stroke-width="1.6" id="rap-n3"/>
+          <text x="390" y="48" text-anchor="middle" font-size="11.5" font-weight="700" fill="#16213A">Tóm tắt TOÀN BỘ</text>
+          <text x="390" y="63" text-anchor="middle" font-size="10" fill="#4A5570">chủ đề &amp; lập luận xuyên suốt</text>
+        </g>
+        <g class="tree-node" id="g-n2a">
+          <rect x="120" y="92" width="160" height="40" rx="9" fill="#FBF3E2" stroke="#B97C1D" stroke-width="1.4" id="rap-n2a"/>
+          <text x="200" y="110" text-anchor="middle" font-size="11" font-weight="700" fill="#16213A">Tóm tắt cụm A</text>
+          <text x="200" y="124" text-anchor="middle" font-size="9.5" fill="#4A5570">cài đặt &amp; khởi tạo</text>
+        </g>
+        <g class="tree-node" id="g-n2b">
+          <rect x="500" y="92" width="160" height="40" rx="9" fill="#FBF3E2" stroke="#B97C1D" stroke-width="1.4" id="rap-n2b"/>
+          <text x="580" y="110" text-anchor="middle" font-size="11" font-weight="700" fill="#16213A">Tóm tắt cụm B</text>
+          <text x="580" y="124" text-anchor="middle" font-size="9.5" fill="#4A5570">cấu hình &amp; tinh chỉnh</text>
+        </g>
+        <g class="tree-node" id="g-l1"><rect x="40" y="164" width="100" height="36" rx="8" fill="#F7F8FC" stroke="#DDE2EF" id="rap-l1"/><text x="90" y="186" text-anchor="middle" font-size="9.5" fill="#4A5570">chunk 1</text></g>
+        <g class="tree-node" id="g-l2"><rect x="150" y="164" width="100" height="36" rx="8" fill="#F7F8FC" stroke="#DDE2EF" id="rap-l2"/><text x="200" y="186" text-anchor="middle" font-size="9.5" fill="#4A5570">chunk 2</text></g>
+        <g class="tree-node" id="g-l3"><rect x="260" y="164" width="100" height="36" rx="8" fill="#F7F8FC" stroke="#DDE2EF" id="rap-l3"/><text x="310" y="186" text-anchor="middle" font-size="9.5" fill="#4A5570">chunk 3</text></g>
+        <g class="tree-node" id="g-l4"><rect x="420" y="164" width="100" height="36" rx="8" fill="#F7F8FC" stroke="#DDE2EF" id="rap-l4"/><text x="470" y="186" text-anchor="middle" font-size="9.5" fill="#4A5570">chunk 4</text></g>
+        <g class="tree-node" id="g-l5"><rect x="530" y="164" width="100" height="36" rx="8" fill="#F7F8FC" stroke="#DDE2EF" id="rap-l5"/><text x="580" y="186" text-anchor="middle" font-size="9" fill="#4A5570">chunk 5 · timeout</text></g>
+        <g class="tree-node" id="g-l6"><rect x="640" y="164" width="100" height="36" rx="8" fill="#F7F8FC" stroke="#DDE2EF" id="rap-l6"/><text x="690" y="186" text-anchor="middle" font-size="9.5" fill="#4A5570">chunk 6</text></g>
+        <text x="390" y="232" text-anchor="middle" font-size="11" fill="#4A5570">Mọi tầng đều được lập chỉ mục — truy vấn tự tìm đúng "độ phân giải" nó cần.</text>
+      </svg>
+      <div class="hint" id="rap-hint"></div>
+    </div>
+
+<pre><code><span class="c"># Dựng cây từ dưới lên, đệ quy tới khi còn 1 nút</span>
+nodes = chunks
+<span class="k">while</span> len(nodes) &gt; 1:
+    clusters = cluster(embed(nodes))            <span class="c"># gom cụm theo ngữ nghĩa</span>
+    nodes    = [llm(<span class="s">"Tóm tắt: "</span> + c) <span class="k">for</span> c <span class="k">in</span> clusters]
+    store.add_all(nodes)                        <span class="c"># ⚠ index MỌI tầng, không chỉ lá</span></code></pre>
+
+    <div class="quiz" data-answer="1">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Vì sao RAPTOR phải lập chỉ mục <b>mọi tầng</b> của cây chứ không chỉ tầng lá hoặc chỉ nút gốc?</p>
+      <div class="opts">
+        <button class="opt">Để tiết kiệm chi phí embed</button>
+        <button class="opt">Vì mỗi loại câu hỏi cần một "độ phân giải" khác nhau — chi tiết khớp lá, tổng hợp khớp nút cao; chỉ index một tầng thì mất một loại câu hỏi</button>
+        <button class="opt">Vì thư viện bắt buộc phải làm vậy</button>
+      </div>
+      <div class="expl">Đây chính là điểm tinh tế của RAPTOR. Chỉ index lá = RAG thường, thua ở câu hỏi tổng hợp. Chỉ index gốc = mất hết chi tiết. Index cả cây cho phép truy vấn <i>tự chọn</i> tầng trừu tượng phù hợp — cùng một kho phục vụ được cả hai loại câu hỏi.</div>
+    </div>
+  </div>
+</section>
+
+<!-- GRAPH RAG -->
+<section class="tech" id="graphrag">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 2/8 · Họ cấu trúc index</div>
+      <h2>Graph RAG — truy xuất theo quan hệ</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage-idx">Index + Truy xuất</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Vector search tìm theo <i>độ giống</i>, không theo <i>mối liên hệ</i>. Câu hỏi nhiều bước như "Bản vá nào sửa lỗ hổng trong thư viện mà service checkout-api đang dùng?" đòi hỏi đi qua một <b>chuỗi quan hệ</b>: service → phụ thuộc → thư viện → được vá bởi → bản phát hành mới. Không chunk đơn lẻ nào chứa cả chuỗi này, nên vector search bó tay.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Trích <b>thực thể</b> (entity) và <b>quan hệ</b> (relation) từ tài liệu thành một đồ thị tri thức. Khi truy vấn: tìm thực thể khởi điểm bằng vector search, rồi <b>đi (traverse) theo cạnh</b> để thu thập các thực thể liên quan qua nhiều bước (multi-hop). Kết hợp cả hai: vector tìm điểm vào, đồ thị mở rộng theo quan hệ.
+    </div>
+
+    <div class="demo" id="gd-demo">
+      <div class="demo-tag">Demo mô phỏng — đi đồ thị nhiều bước</div>
+      <p style="font-size:.9rem">Truy vấn: <span class="qtag">"Bản vá nào sửa lỗ hổng trong thư viện mà checkout-api đang dùng?"</span></p>
+      <div class="controls">
+        <button class="primary" id="gd-btn">Bước 1: Tìm thực thể khởi điểm ▸</button>
+        <button id="gd-reset">↺ Làm lại</button>
+      </div>
+      <svg viewBox="0 0 760 210" width="100%" style="min-width:600px" role="img" aria-label="Đồ thị tri thức với các bước đi">
+        <g stroke="#DDE2EF" stroke-width="2" fill="none">
+          <line class="g-edge" id="e1" x1="140" y1="105" x2="290" y2="105"/>
+          <line class="g-edge" id="e2" x1="410" y1="105" x2="560" y2="105"/>
+          <line class="g-edge" id="e3" x1="350" y1="80" x2="350" y2="50"/>
+        </g>
+        <g font-size="10" fill="#4A5570" text-anchor="middle">
+          <text x="215" y="96">phụ thuộc</text>
+          <text x="485" y="96">được vá bởi</text>
+          <text x="392" y="68">thuộc</text>
+        </g>
+        <rect id="n1" x="40" y="84" width="100" height="42" rx="10" fill="#F7F8FC" stroke="#DDE2EF" stroke-width="1.6"/>
+        <text x="90" y="102" text-anchor="middle" font-size="11" font-weight="700" fill="#16213A">checkout-api</text>
+        <text x="90" y="117" text-anchor="middle" font-size="9.5" fill="#4A5570">service</text>
+        <rect id="n2" x="290" y="84" width="120" height="42" rx="10" fill="#F7F8FC" stroke="#DDE2EF" stroke-width="1.6"/>
+        <text x="350" y="102" text-anchor="middle" font-size="11" font-weight="700" fill="#16213A">auth-lib v2.1</text>
+        <text x="350" y="117" text-anchor="middle" font-size="9.5" fill="#4A5570">thư viện</text>
+        <rect id="n3" x="560" y="84" width="150" height="42" rx="10" fill="#F7F8FC" stroke="#DDE2EF" stroke-width="1.6"/>
+        <text x="635" y="102" text-anchor="middle" font-size="11" font-weight="700" fill="#16213A">auth-lib v2.3</text>
+        <text x="635" y="117" text-anchor="middle" font-size="9.5" fill="#4A5570">bản vá bảo mật ★</text>
+        <rect id="n4" x="290" y="16" width="120" height="34" rx="10" fill="#F7F8FC" stroke="#DDE2EF" stroke-width="1.4"/>
+        <text x="350" y="38" text-anchor="middle" font-size="10.5" fill="#4A5570">nhóm Platform</text>
+      </svg>
+      <ul class="hop-log" id="gd-log"></ul>
+      <div class="hint" id="gd-hint">Vector search một mình chỉ tìm được "checkout-api" — không có chunk nào nối được nó tới auth-lib v2.3.</div>
+    </div>
+
+    <div class="quiz" data-answer="0">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Chi phí lớn nhất khi triển khai Graph RAG nằm ở đâu?</p>
+      <div class="opts">
+        <button class="opt">Ở bước trích thực thể &amp; quan hệ lúc lập chỉ mục — cần LLM đọc toàn kho, và chất lượng đồ thị quyết định toàn bộ chất lượng truy xuất</button>
+        <button class="opt">Ở bước đi đồ thị lúc truy vấn</button>
+        <button class="opt">Ở chi phí lưu trữ đồ thị</button>
+      </div>
+      <div class="expl">Đi đồ thị vốn rẻ và nhanh. Cái đắt là <b>xây</b> nó: LLM phải đọc từng tài liệu để trích thực thể/quan hệ — tốn kém trên kho lớn, và trích sai thì đồ thị sai, mọi truy vấn multi-hop đi lạc. Đây là lý do Graph RAG thường được hoãn tới khi đã cạn các kỹ thuật rẻ hơn.</div>
+    </div>
+  </div>
+</section>
+
+<!-- MS GRAPHRAG -->
+<section class="tech" id="msgraph">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 3/8 · Họ cấu trúc index</div>
+      <h2>Microsoft GraphRAG</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage-idx">Index + Truy xuất</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Graph RAG thường giỏi câu hỏi <i>cục bộ nhiều bước</i> ("X liên quan gì tới Y?"), nhưng vẫn kém với câu hỏi <b>toàn cục</b> ("những chủ đề lớn nào nổi lên trong toàn bộ kho này?"). Đi đồ thị từ một điểm vào không bao giờ "nhìn thấy" bức tranh tổng thể.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi — cộng đồng &amp; tóm tắt từ dưới lên</b>
+      Sau khi dựng đồ thị, chạy thuật toán <b>phát hiện cộng đồng</b> (community detection) để nhóm các thực thể liên kết chặt thành cụm. Rồi <b>tóm tắt từng cộng đồng</b>, và tóm tắt các cộng đồng lớn hơn — tạo hệ thống phân cấp giống RAPTOR, nhưng dựa trên <i>cấu trúc quan hệ</i> thay vì <i>độ giống ngữ nghĩa</i>.
+    </div>
+
+    <div class="panel">
+      <svg viewBox="0 0 780 190" width="100%" style="min-width:620px" role="img" aria-label="Quy trình Microsoft GraphRAG">
+        <defs><marker id="ga" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4A5570"/></marker></defs>
+        <g font-size="12" font-weight="700" text-anchor="middle" fill="#16213A">
+          <rect x="14" y="60" width="150" height="54" rx="10" fill="#F7F8FC" stroke="#DDE2EF"/>
+          <text x="89" y="82">① Trích thực thể</text><text x="89" y="99" font-weight="400" font-size="10.5" fill="#4A5570">LLM đọc toàn kho</text>
+          <rect x="204" y="60" width="150" height="54" rx="10" fill="#EFE9F8" stroke="#6B4BA8"/>
+          <text x="279" y="82">② Dựng đồ thị</text><text x="279" y="99" font-weight="400" font-size="10.5" fill="#4A5570">thực thể + quan hệ</text>
+          <rect x="394" y="60" width="170" height="54" rx="10" fill="#EFE9F8" stroke="#6B4BA8"/>
+          <text x="479" y="82">③ Phát hiện cộng đồng</text><text x="479" y="99" font-weight="400" font-size="10.5" fill="#4A5570">cụm liên kết chặt</text>
+          <rect x="604" y="60" width="160" height="54" rx="10" fill="#E3F4EF" stroke="#1F8A70"/>
+          <text x="684" y="82">④ Tóm tắt phân cấp</text><text x="684" y="99" font-weight="400" font-size="10.5" fill="#4A5570">cộng đồng → toàn cục</text>
+        </g>
+        <g stroke="#4A5570" stroke-width="1.6">
+          <line x1="164" y1="87" x2="200" y2="87" marker-end="url(#ga)"/>
+          <line x1="354" y1="87" x2="390" y2="87" marker-end="url(#ga)"/>
+          <line x1="564" y1="87" x2="600" y2="87" marker-end="url(#ga)"/>
+        </g>
+        <text x="390" y="150" text-anchor="middle" font-size="11.5" fill="#4A5570">Câu hỏi cục bộ → đi đồ thị (như Graph RAG). Câu hỏi toàn cục → đọc tóm tắt cộng đồng.</text>
+        <text x="390" y="170" text-anchor="middle" font-size="11" fill="#B0455A">Đánh đổi: chi phí lập chỉ mục rất cao — LLM chạy qua toàn kho nhiều lượt.</text>
+      </svg>
+    </div>
+
+    <div class="quiz" data-answer="2">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">RAPTOR và Microsoft GraphRAG đều dựng phân cấp tóm tắt. Khác biệt cốt lõi là gì?</p>
+      <div class="opts">
+        <button class="opt">RAPTOR dùng LLM, GraphRAG thì không</button>
+        <button class="opt">Chúng hoàn toàn giống nhau</button>
+        <button class="opt">RAPTOR gom cụm theo <i>độ giống ngữ nghĩa</i> của nội dung; GraphRAG gom cụm theo <i>cấu trúc quan hệ</i> giữa các thực thể</button>
+      </div>
+      <div class="expl">Cùng ý tưởng "tóm tắt phân cấp để trả lời câu hỏi toàn cục", khác ở <b>tiêu chí gom nhóm</b>. RAPTOR: các chunk nói chuyện giống nhau thì vào một cụm. GraphRAG: các thực thể liên kết chặt với nhau thì vào một cộng đồng — kể cả khi văn bản mô tả chúng khác nhau hoàn toàn. GraphRAG mạnh hơn khi cấu trúc quan hệ mới là thứ định nghĩa chủ đề.</div>
+    </div>
+  </div>
+</section>
+
+<!-- SELF-RAG -->
+<section class="tech" id="selfrag">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 4/8 · Họ vòng lặp tự đánh giá</div>
+      <h2>Self-RAG</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage-all">Toàn pipeline + vòng lặp</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      RAG thường <b>luôn luôn truy xuất</b>, kể cả khi không cần. Hỏi "2+2 bằng mấy?" hay "viết giúp tôi một bài thơ" mà vẫn đi tìm tài liệu → lãng phí, và tệ hơn, tài liệu lạc đề chèn vào ngữ cảnh có thể <i>làm hỏng</i> câu trả lời vốn dĩ LLM tự làm tốt.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi — bốn câu tự hỏi</b>
+      Cho mô hình <b>tự phản tỉnh</b> tại nhiều điểm: (1) <i>Có cần truy xuất không?</i> (2) <i>Tài liệu lấy được có liên quan không?</i> (3) <i>Câu trả lời có được tài liệu chống lưng không?</i> (4) <i>Câu trả lời có hữu ích không?</i> Mỗi câu là một điểm quyết định — không đạt thì quay lại hoặc bỏ.
+    </div>
+
+    <div class="demo" id="sf-demo">
+      <div class="demo-tag">Demo mô phỏng — theo dấu quyết định của Self-RAG</div>
+      <div class="controls">
+        <label style="font-size:.88rem">Chọn câu hỏi:
+          <select id="sf-q">
+            <option value="need">"Timeout mặc định của connection pool là bao nhiêu?"</option>
+            <option value="noneed">"Viết giúp tôi một câu chúc mừng sinh nhật đồng nghiệp"</option>
+            <option value="fail">"Số lượng người dùng hoạt động tháng trước của hệ thống tôi là bao nhiêu?"</option>
+          </select>
+        </label>
+      </div>
+      <div class="flow-steps" id="sf-flow"></div>
+      <div class="hint" id="sf-hint"></div>
+    </div>
+
+    <div class="quiz" data-answer="0">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Điểm quyết định "có cần truy xuất không?" mang lại lợi ích gì mà các kỹ thuật trước không có?</p>
+      <div class="opts">
+        <button class="opt">Nó cho phép hệ thống <b>bỏ qua</b> truy xuất khi không cần — tránh việc tài liệu lạc đề chèn vào và làm hỏng câu trả lời LLM vốn tự làm tốt</button>
+        <button class="opt">Nó làm tăng recall</button>
+        <button class="opt">Nó thay thế được reranking</button>
+      </div>
+      <div class="expl">Mọi kỹ thuật ở các batch trước đều giả định "đã truy xuất rồi thì làm sao cho tốt". Self-RAG lùi một bước và hỏi <i>có nên truy xuất không</i>. Với câu hỏi sáng tạo hoặc kiến thức phổ thông, truy xuất không những vô ích mà còn có hại — tài liệu ngẫu nhiên trong ngữ cảnh kéo câu trả lời lệch hướng.</div>
+    </div>
+  </div>
+</section>
+
+<!-- CRAG -->
+<section class="tech" id="crag">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 5/8 · Họ vòng lặp tự đánh giá</div>
+      <h2>Corrective RAG (CRAG)</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage-all">Truy xuất + vòng sửa lỗi</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Reliable RAG (Batch 2) biết loại tài liệu kém và nói "không đủ dữ liệu" — thành thật nhưng <b>bế tắc</b>. Người dùng vẫn không có câu trả lời. Nếu truy xuất kém, tại sao không <i>làm gì đó để sửa</i> thay vì đầu hàng?
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi — ba nhánh theo mức độ tin cậy</b>
+      Chấm điểm kết quả truy xuất, rồi rẽ nhánh: <b>Correct</b> (điểm cao) → tinh lọc và dùng luôn. <b>Ambiguous</b> (điểm giữa) → vừa dùng tài liệu nội bộ vừa bổ sung web search. <b>Incorrect</b> (điểm thấp) → bỏ hẳn tài liệu nội bộ, viết lại truy vấn và <b>tìm trên web</b>. Đây là bước từ "thành thật" sang "chủ động sửa".
+    </div>
+
+    <div class="demo" id="cr-demo">
+      <div class="demo-tag">Demo mô phỏng — ba nhánh của CRAG</div>
+      <div class="controls" role="group">
+        <button class="mode on" data-cr="hi">Điểm cao → Correct</button>
+        <button class="mode" data-cr="mid">Điểm giữa → Ambiguous</button>
+        <button class="mode" data-cr="lo">Điểm thấp → Incorrect</button>
+      </div>
+      <div class="flow-steps" id="cr-flow"></div>
+      <div class="hint" id="cr-hint"></div>
+    </div>
+
+    <div class="duo">
+      <div class="col yes"><h4>Nên dùng khi</h4><ul>
+        <li>Kho nội bộ có "lỗ hổng" — nhiều câu hỏi hợp lệ nhưng kho không phủ.</li>
+        <li>Chấp nhận được nguồn web bổ sung (không phải bối cảnh yêu cầu nguồn khép kín).</li>
+        <li>Muốn hệ thống <i>vẫn trả lời được</i> thay vì chỉ báo "không có dữ liệu".</li>
+      </ul></div>
+      <div class="col no"><h4>Không nên / lưu ý</h4><ul>
+        <li><b>Khi chỉ nguồn chính thức được chấp nhận</b> — web search có thể kéo về câu trả lời StackOverflow đã lỗi thời hoặc sai phiên bản. Cân nhắc giới hạn nhánh web ở nguồn whitelist (docs chính thức, repo gốc).</li>
+        <li>Thêm nhiều LLM call + web latency mỗi truy vấn.</li>
+        <li>Bộ chấm điểm sai → rẽ nhầm nhánh, tệ hơn không có CRAG.</li>
+      </ul></div>
+    </div>
+
+    <div class="quiz" data-answer="1">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Reliable RAG và CRAG cùng phát hiện "truy xuất kém". Chúng phản ứng khác nhau thế nào?</p>
+      <div class="opts">
+        <button class="opt">Cả hai đều tìm web</button>
+        <button class="opt">Reliable RAG dừng lại và báo "không đủ dữ liệu"; CRAG chủ động <b>sửa</b> — viết lại truy vấn, tìm nguồn thay thế để vẫn ra được câu trả lời</button>
+        <button class="opt">Reliable RAG chính xác hơn CRAG</button>
+      </div>
+      <div class="expl">Cùng một chẩn đoán, hai triết lý xử lý. Reliable RAG ưu tiên <b>an toàn</b>: thà im lặng còn hơn sai. CRAG ưu tiên <b>hữu ích</b>: thử mọi cách để trả lời được. Chọn cái nào phụ thuộc bối cảnh — hướng dẫn vận hành production thường nghiêng về Reliable RAG (hoặc CRAG có whitelist nguồn), trợ lý tra cứu tổng hợp nghiêng về CRAG.</div>
+    </div>
+  </div>
+</section>
+
+<!-- AGENTIC -->
+<section class="tech" id="agentic">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 6/8</div>
+      <h2>Agentic RAG</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage-all">Toàn pipeline có agent</span></div>
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Thay vì pipeline cố định, một <b>agent</b> điều phối: nó tự viết lại truy vấn, chọn công cụ (vector search, web, SQL...), phân tích kết quả, chấm lại, và <i>lặp</i> cho tới khi đủ tin cậy để trả lời có căn cứ (grounded). Self-RAG và CRAG là những "agent chuyên trách một việc"; Agentic RAG tổng quát hóa: agent có <b>nhiều công cụ</b> và tự quyết chuỗi hành động.
+    </div>
+
+    <p>Điểm mấu chốt để hiểu: các kỹ thuật ở nhóm này nằm trên một <b>phổ tự chủ</b>. Adaptive Retrieval (Batch 5) có <i>một</i> điểm quyết định. Self-RAG có <i>bốn</i>. CRAG có <i>ba nhánh</i>. Agentic RAG có <i>vòng lặp mở</i> — số bước không định trước. Càng tự chủ càng mạnh, nhưng càng khó dự đoán, khó debug, và tốn kém.</p>
+
+    <div class="panel problem">
+      <b>Cái giá của tự chủ</b>
+      Vòng lặp mở nghĩa là: chi phí một truy vấn không đoán trước được, agent có thể lặp vô hạn (phải đặt giới hạn bước), và khi sai thì rất khó truy vết nguyên nhân. Đây là lý do <b>không nên bắt đầu</b> từ Agentic RAG — chỉ dùng khi các kiến trúc đơn giản đã chứng minh không đủ.
+    </div>
+  </div>
+</section>
+
+<!-- MEMORAG -->
+<section class="tech" id="memorag">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 7/8</div>
+      <h2>MemoRAG</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage">Truy xuất có bộ nhớ</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Truy vấn của người dùng thường <b>quá mơ hồ để tìm trực tiếp</b> trên kho khổng lồ — nhất là khi họ hỏi về thứ họ chỉ nhớ mang máng ("cái postmortem nói về vụ sập cache ấy"). Không đủ từ khóa cụ thể để vector search bám vào.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi — bộ nhớ sinh manh mối</b>
+      Duy trì một <b>bộ nhớ nén</b> (key–value) của toàn kho. Khi có truy vấn mơ hồ, dùng bộ nhớ để <b>sinh ra "truy vấn thay thế" (surrogate query)</b> — những manh mối cụ thể hơn, gần với từ ngữ thật trong tài liệu — rồi mới đi tìm bằng các manh mối đó. Bộ nhớ đóng vai "người biết đại khái kho có gì" để gợi ý hướng tìm.
+    </div>
+
+    <p style="font-size:.9rem;color:var(--ink-soft)">Liên hệ: đây là họ hàng xa của <a href="01-query-enhancement.html#hyde">HyDE</a> — cùng sinh ra thứ trung gian để tìm thay vì tìm bằng truy vấn thô. Khác biệt: HyDE dùng kiến thức chung của LLM để bịa tài liệu giả; MemoRAG dùng <b>bộ nhớ về chính kho tài liệu</b> để sinh manh mối bám sát nội dung thật.</p>
+  </div>
+</section>
+
+<!-- CONTROLLABLE -->
+<section class="tech" id="controllable">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 8/8</div>
+      <h2>Controllable RAG Agent</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage-all">Agent có đồ thị điều khiển</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Agentic RAG mạnh nhưng <b>không kiểm soát được</b>: agent tự do quyết định nên có thể đi lạc, lặp vô ích, hoặc bỏ sót bước bắt buộc. Trong môi trường production — nhất là khi cần kiểm toán từng bước — "agent tự do" là rủi ro vận hành.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi — đồ thị xác định làm bộ não</b>
+      Thay vì để LLM tự do chọn bước tiếp theo, định nghĩa trước một <b>đồ thị trạng thái xác định</b> (deterministic graph) mô tả các bước hợp lệ và điều kiện chuyển. LLM chỉ ra quyết định <i>trong khuôn khổ</i> đồ thị đó. Kết quả: giữ được khả năng suy luận nhiều bước, nhưng đường đi <b>dự đoán được, kiểm toán được, debug được</b>.
+    </div>
+
+    <div class="panel">
+      <svg viewBox="0 0 780 130" width="100%" style="min-width:600px" role="img" aria-label="Phổ tự chủ từ pipeline cố định tới agent tự do">
+        <line x1="60" y1="60" x2="720" y2="60" stroke="#DDE2EF" stroke-width="3"/>
+        <g text-anchor="middle" font-size="10.5">
+          <circle cx="80" cy="60" r="7" fill="#1F8A70"/><text x="80" y="42" font-weight="700" fill="#1F8A70">Simple RAG</text><text x="80" y="84" fill="#4A5570">0 quyết định</text>
+          <circle cx="240" cy="60" r="7" fill="#3B4CC0"/><text x="240" y="42" font-weight="700" fill="#3B4CC0">Adaptive</text><text x="240" y="84" fill="#4A5570">1 quyết định</text>
+          <circle cx="400" cy="60" r="7" fill="#B97C1D"/><text x="400" y="42" font-weight="700" fill="#B97C1D">Self-RAG / CRAG</text><text x="400" y="84" fill="#4A5570">3–4 quyết định</text>
+          <circle cx="560" cy="60" r="7" fill="#6B4BA8"/><text x="560" y="42" font-weight="700" fill="#6B4BA8">Controllable Agent</text><text x="560" y="84" fill="#4A5570">vòng lặp có khuôn</text>
+          <circle cx="700" cy="60" r="7" fill="#B0455A"/><text x="700" y="42" font-weight="700" fill="#B0455A">Agentic RAG</text><text x="700" y="84" fill="#4A5570">vòng lặp mở</text>
+        </g>
+        <text x="60" y="112" text-anchor="start" font-size="11" fill="#1F8A70">← dự đoán được, rẻ, dễ debug</text>
+        <text x="720" y="112" text-anchor="end" font-size="11" fill="#B0455A">mạnh, linh hoạt, khó kiểm soát →</text>
+      </svg>
+    </div>
+
+    <div class="quiz" data-answer="2">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Nhìn vào phổ tự chủ ở trên, nguyên tắc chọn kiến trúc nào là hợp lý nhất?</p>
+      <div class="opts">
+        <button class="opt">Luôn chọn cái bên phải nhất vì nó mạnh nhất</button>
+        <button class="opt">Luôn chọn cái bên trái nhất vì nó rẻ nhất</button>
+        <button class="opt">Đi từ trái sang phải: chỉ leo lên mức tự chủ cao hơn khi có bằng chứng (từ eval) rằng mức hiện tại không đủ</button>
+      </div>
+      <div class="expl">Mỗi bước sang phải đổi <b>khả năng dự đoán</b> lấy <b>sức mạnh</b>. Nhảy thẳng lên Agentic RAG cho một bài toán mà Fusion + Rerank giải được là tự chuốc lấy chi phí, độ trễ và nợ vận hành vô ích. Nguyên tắc xuyên suốt sổ tay này: <i>eval quyết định, không phải trực giác</i>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARE -->
+<section class="tech" id="compare">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Tổng kết nhóm</div>
+      <h2>So sánh 8 kiến trúc</h2>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Kiến trúc</th><th>Họ</th><th>Chi phí index</th><th>Chi phí truy vấn</th><th>Giải bài toán riêng</th></tr></thead>
+      <tbody>
+        <tr><td><b>RAPTOR</b></td><td>Cấu trúc index</td><td>Cao (LLM tóm tắt đệ quy)</td><td>Thấp</td><td>Câu hỏi tổng hợp toàn tài liệu</td></tr>
+        <tr><td><b>Graph RAG</b></td><td>Cấu trúc index</td><td>Cao (trích thực thể)</td><td>Vừa</td><td>Suy luận nhiều bước qua quan hệ</td></tr>
+        <tr><td><b>MS GraphRAG</b></td><td>Cấu trúc index</td><td>Rất cao</td><td>Vừa</td><td>Chủ đề toàn cục theo cấu trúc quan hệ</td></tr>
+        <tr><td><b>Self-RAG</b></td><td>Vòng lặp tự đánh giá</td><td>Không đổi</td><td>Cao (nhiều LLM call)</td><td>Biết khi nào KHÔNG cần truy xuất</td></tr>
+        <tr><td><b>CRAG</b></td><td>Vòng lặp tự đánh giá</td><td>Không đổi</td><td>Cao (+ web search)</td><td>Tự sửa khi kho không phủ</td></tr>
+        <tr><td><b>Agentic RAG</b></td><td>Agent</td><td>Không đổi</td><td>Rất cao, không đoán trước</td><td>Bài toán mở, nhiều công cụ</td></tr>
+        <tr><td><b>MemoRAG</b></td><td>Bộ nhớ</td><td>Cao (dựng bộ nhớ)</td><td>Vừa</td><td>Truy vấn mơ hồ trên kho khổng lồ</td></tr>
+        <tr><td><b>Controllable Agent</b></td><td>Agent có khuôn</td><td>Không đổi</td><td>Cao nhưng có trần</td><td>Agent cho production cần kiểm toán</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="summary">
+      <h3>Ghi nhớ 5 điều</h3>
+      <ul>
+        <li>Tám kiến trúc chia hai họ rõ rệt: <b>tái cấu trúc index</b> (RAPTOR, Graph, MS GraphRAG, MemoRAG — trả chi phí lúc lập chỉ mục) và <b>thêm vòng lặp quyết định</b> (Self-RAG, CRAG, Agentic, Controllable — trả chi phí lúc truy vấn).</li>
+        <li>RAPTOR vs MS GraphRAG: cùng tóm tắt phân cấp, khác tiêu chí gom nhóm — <i>độ giống ngữ nghĩa</i> vs <i>cấu trúc quan hệ</i>.</li>
+        <li>Self-RAG đóng góp câu hỏi mà mọi kỹ thuật trước bỏ qua: <b>có nên truy xuất không?</b></li>
+        <li>Reliable RAG dừng lại khi truy xuất kém; CRAG chủ động sửa. Chọn theo bối cảnh: an toàn vs hữu ích.</li>
+        <li><b>Phổ tự chủ</b> là khung tư duy quan trọng nhất của nhóm này: leo lên mức cao hơn chỉ khi eval chứng minh mức hiện tại không đủ.</li>
+      </ul>
+    </div>
+
+    <div class="nav-next">
+      <a href="06-iterative-adaptive.html">← Xem lại: Vòng lặp &amp; thích ứng</a>
+      <a href="index.html">Trang tổng quan →</a>
+    </div>
+    <p style="font-size:.85rem;color:var(--ink-soft)">Batch 6 hoàn tất nhóm Kiến trúc nâng cao (29/35 kỹ thuật). Batch cuối: nhóm Đánh giá &amp; minh bạch — DeepEval, GroUSE, End-to-End Evaluation, Open-RAG-Eval, Explainable Retrieval. Chính là bộ công cụ trả lời câu hỏi "kỹ thuật nào thực sự đáng dùng?" mà cả sổ tay này liên tục nhắc tới.</p>
+  </div>
+</section>
+
+<script>
+addEventListener('scroll',function(){
+  var h=document.documentElement;
+  document.getElementById('progress').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';
+},{passive:true});
+
+/* RAPTOR */
+var RAP={
+ local:{hits:['rap-l5'],dim:['g-n3','g-n2a'],
+  note:'Truy vấn CHI TIẾT khớp thẳng vào lá (chunk 5 chứa giá trị timeout cụ thể). Nút tóm tắt ở tầng trên quá chung chung nên không thắng — cây không cản trở truy vấn cục bộ.'},
+ global:{hits:['rap-n3'],dim:['g-l1','g-l2','g-l3','g-l4','g-l5','g-l6'],
+  note:'Truy vấn TỔNG HỢP khớp nút gốc — bản tóm tắt toàn bộ. Không lá nào chứa câu trả lời "chủ đề xuyên suốt là gì", vì thông tin đó chỉ tồn tại sau khi tổng hợp. Đây chính là điều RAG phẳng không làm được.'}
+};
+var RAP_GROUPS=['g-n3','g-n2a','g-n2b','g-l1','g-l2','g-l3','g-l4','g-l5','g-l6'];
+var RAP_RECTS={'rap-n3':'#EFE9F8','rap-n2a':'#FBF3E2','rap-n2b':'#FBF3E2','rap-l1':'#F7F8FC','rap-l2':'#F7F8FC','rap-l3':'#F7F8FC','rap-l4':'#F7F8FC','rap-l5':'#F7F8FC','rap-l6':'#F7F8FC'};
+function rapRender(){
+  var k=document.getElementById('rap-q').value, d=RAP[k];
+  RAP_GROUPS.forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.style.opacity = d.dim.indexOf(id)>-1 ? '.28' : '1';
+  });
+  Object.keys(RAP_RECTS).forEach(function(id){
+    var r=document.getElementById(id); if(!r)return;
+    if(d.hits.indexOf(id)>-1){r.setAttribute('fill','#E3F4EF');r.setAttribute('stroke','#1F8A70');r.setAttribute('stroke-width','3');}
+    else{r.setAttribute('fill',RAP_RECTS[id]);
+      r.setAttribute('stroke', id==='rap-n3'?'#6B4BA8':(id.indexOf('rap-n2')===0?'#B97C1D':'#DDE2EF'));
+      r.setAttribute('stroke-width', id.indexOf('rap-l')===0?'1':'1.5');}
+  });
+  document.getElementById('rap-hint').textContent=d.note;
+}
+document.getElementById('rap-q').addEventListener('change',rapRender);
+rapRender();
+
+/* Graph RAG */
+var GSTEPS=[
+ {edges:[],nodes:['n1'],log:'Bước 1 — Vector search tìm thực thể khởi điểm: service "checkout-api". Đến đây RAG thường đã hết bài.'},
+ {edges:['e1'],nodes:['n1','n2'],log:'Bước 2 — Đi cạnh "phụ thuộc": checkout-api → auth-lib v2.1. Quan hệ này nằm trong đồ thị, không nằm trong bất kỳ chunk nào.'},
+ {edges:['e1','e2'],nodes:['n1','n2','n3'],log:'Bước 3 — Đi tiếp cạnh "được vá bởi": auth-lib v2.1 → auth-lib v2.3. ★ Tìm ra câu trả lời sau 2 hop.'}
+];
+var gStep=0;
+function gRender(){
+  ['e1','e2','e3'].forEach(function(id){var e=document.getElementById(id);e.classList.remove('lit');e.classList.add('dim');});
+  ['n1','n2','n3','n4'].forEach(function(id){var n=document.getElementById(id);n.setAttribute('fill','#F7F8FC');n.setAttribute('stroke','#DDE2EF');n.setAttribute('stroke-width','1.4');});
+  var log=document.getElementById('gd-log'), b=document.getElementById('gd-btn');
+  if(gStep===0){
+    log.innerHTML=''; b.textContent='Bước 1: Tìm thực thể khởi điểm ▸'; b.disabled=false;
+    document.getElementById('gd-hint').textContent='Vector search một mình chỉ tìm được "checkout-api" — không có chunk nào nối được nó tới auth-lib v2.3.';
+    return;
+  }
+  var s=GSTEPS[gStep-1];
+  s.edges.forEach(function(id){var e=document.getElementById(id);e.classList.add('lit');e.classList.remove('dim');});
+  s.nodes.forEach(function(id,i){
+    var n=document.getElementById(id), last=(i===s.nodes.length-1);
+    n.setAttribute('fill',last?'#E3F4EF':'#EFE9F8');
+    n.setAttribute('stroke',last?'#1F8A70':'#6B4BA8');
+    n.setAttribute('stroke-width','2.4');
+  });
+  log.innerHTML='';
+  GSTEPS.slice(0,gStep).forEach(function(x){
+    var li=document.createElement('li'); li.textContent=x.log; log.appendChild(li);
+    setTimeout(function(){li.classList.add('show');},30);
+  });
+  if(gStep===1)b.textContent='Bước 2: Đi cạnh "phụ thuộc" ▸';
+  else if(gStep===2)b.textContent='Bước 3: Đi cạnh "được vá bởi" ▸';
+  else{b.disabled=true;b.textContent='Hoàn tất — nhấn ↺';
+    document.getElementById('gd-hint').innerHTML='Câu trả lời chỉ xuất hiện sau khi đi <b>2 hop</b> qua đồ thị. Không chunk văn bản nào chứa chuỗi "checkout-api → auth-lib v2.1 → auth-lib v2.3" — đây là loại câu hỏi vector search về nguyên tắc không giải được.';}
+}
+document.getElementById('gd-btn').addEventListener('click',function(){gStep=Math.min(gStep+1,3);gRender();});
+document.getElementById('gd-reset').addEventListener('click',function(){gStep=0;gRender();});
+gRender();
+
+/* Self-RAG */
+var SRQ={
+ need:[
+  {n:'1',b:'Có cần truy xuất không?',s:'Câu hỏi về sự thật cụ thể trong tài liệu kỹ thuật → CÓ',v:'ok',p:'✔ Truy xuất'},
+  {n:'2',b:'Tài liệu có liên quan không?',s:'Lấy được Mục 4.2 về cấu hình connection pool → liên quan',v:'ok',p:'✔ Giữ'},
+  {n:'3',b:'Câu trả lời có được chống lưng?',s:'Mọi con số đều trích từ Mục 4.2 → có căn cứ',v:'ok',p:'✔ Grounded'},
+  {n:'4',b:'Câu trả lời có hữu ích?',s:'Trả lời trực tiếp, kèm trích dẫn → hữu ích',v:'ok',p:'✔ Trả về'}
+ ],
+ noneed:[
+  {n:'1',b:'Có cần truy xuất không?',s:'Yêu cầu sáng tạo, không cần dữ kiện từ kho → KHÔNG',v:'no',p:'✗ Bỏ qua truy xuất'},
+  {n:'—',b:'Bỏ qua bước 2 & 3',s:'Không có tài liệu nên không cần chấm liên quan hay căn cứ',v:'',p:''},
+  {n:'4',b:'Câu trả lời có hữu ích?',s:'LLM tự viết câu chúc → hữu ích',v:'ok',p:'✔ Trả về'}
+ ],
+ fail:[
+  {n:'1',b:'Có cần truy xuất không?',s:'Hỏi số liệu vận hành cụ thể → CÓ',v:'ok',p:'✔ Truy xuất'},
+  {n:'2',b:'Tài liệu có liên quan không?',s:'Kho chỉ có tài liệu kỹ thuật, không có số liệu vận hành → KHÔNG liên quan',v:'no',p:'✗ Loại hết'},
+  {n:'3',b:'Còn căn cứ nào không?',s:'Không tài liệu nào chống lưng được câu trả lời',v:'no',p:'✗ Không grounded'},
+  {n:'4',b:'Kết luận',s:'Từ chối trả lời thay vì bịa: "Kho không có số liệu người dùng hoạt động."',v:'no',p:'⚠ Thành thật từ chối'}
+ ]
+};
+var SRNOTE={
+ need:'Đường "xuôi chèo": cả 4 cổng đều đạt → trả lời có căn cứ. Đây là kịch bản RAG lý tưởng.',
+ noneed:'Cổng 1 chặn ngay: nhận ra không cần truy xuất → bỏ qua luôn bước 2 & 3. Tiết kiệm chi phí VÀ tránh việc tài liệu ngẫu nhiên làm hỏng một câu chúc vốn LLM tự viết tốt.',
+ fail:'Cổng 2 phát hiện tài liệu không liên quan → chuỗi sụp đổ có kiểm soát, hệ thống từ chối thay vì bịa. So sánh: RAG thường sẽ nhồi tài liệu lạc đề vào và sinh ra con số bịa nghe rất thuyết phục.'
+};
+function sfRender(){
+  var k=document.getElementById('sf-q').value;
+  var box=document.getElementById('sf-flow'); box.innerHTML='';
+  SRQ[k].forEach(function(s){
+    var d=document.createElement('div');
+    d.className='fstep '+(s.v||'on');
+    var pill=s.p?'<span class="verdict-pill '+(s.v==='ok'?'vp-ok':(s.v==='no'?'vp-no':'vp-mid'))+'">'+s.p+'</span>':'';
+    d.innerHTML='<span class="n">'+s.n+'</span><span class="body"><b>'+s.b+'</b><span>'+s.s+'</span>'+pill+'</span>';
+    box.appendChild(d);
+  });
+  document.getElementById('sf-hint').textContent=SRNOTE[k];
+}
+document.getElementById('sf-q').addEventListener('change',sfRender);
+sfRender();
+
+/* CRAG */
+var CR={
+ hi:{steps:[
+  {n:'1',b:'Truy xuất từ kho nội bộ',s:'Lấy top-5 tài liệu',v:'on',p:''},
+  {n:'2',b:'Chấm điểm độ tin cậy',s:'Điểm cao — tài liệu rõ ràng trả lời được câu hỏi',v:'ok',p:'CORRECT'},
+  {n:'3',b:'Tinh lọc (refine)',s:'Cắt bỏ phần thừa trong tài liệu, giữ phần cốt lõi',v:'ok',p:'✔'},
+  {n:'4',b:'Sinh câu trả lời',s:'Chỉ dùng nguồn nội bộ — không cần web',v:'ok',p:'✔ Xong'}
+ ],note:'Nhánh Correct: kho phủ được câu hỏi. CRAG hành xử gần như RAG thường, chỉ thêm bước tinh lọc.'},
+ mid:{steps:[
+  {n:'1',b:'Truy xuất từ kho nội bộ',s:'Lấy top-5 tài liệu',v:'on',p:''},
+  {n:'2',b:'Chấm điểm độ tin cậy',s:'Điểm giữa — tài liệu liên quan nhưng không đủ chắc chắn',v:'',p:'AMBIGUOUS'},
+  {n:'3',b:'Kết hợp hai nguồn',s:'Giữ tài liệu nội bộ VÀ bổ sung kết quả web search',v:'on',p:'⚖ Cả hai'},
+  {n:'4',b:'Sinh câu trả lời',s:'Tổng hợp nội bộ + web, ưu tiên nguồn nội bộ khi mâu thuẫn',v:'ok',p:'✔ Xong'}
+ ],note:'Nhánh Ambiguous: không tin hẳn cũng không bỏ hẳn — bổ sung web để lấp chỗ trống. Đây là nhánh tinh tế nhất, và cũng dễ gây mâu thuẫn nguồn nhất.'},
+ lo:{steps:[
+  {n:'1',b:'Truy xuất từ kho nội bộ',s:'Lấy top-5 tài liệu',v:'on',p:''},
+  {n:'2',b:'Chấm điểm độ tin cậy',s:'Điểm thấp — kho không phủ chủ đề này',v:'no',p:'INCORRECT'},
+  {n:'3',b:'Bỏ tài liệu nội bộ + viết lại truy vấn',s:'Loại toàn bộ kết quả nội bộ, rewrite truy vấn cho web search',v:'no',p:'↻ Sửa'},
+  {n:'4',b:'Web search & sinh câu trả lời',s:'Trả lời hoàn toàn từ nguồn web, ghi rõ nguồn ngoài',v:'ok',p:'✔ Vẫn trả lời được'}
+ ],note:'Nhánh Incorrect: đây là chỗ CRAG khác Reliable RAG. Thay vì báo "không đủ dữ liệu" và dừng, nó viết lại truy vấn và tìm nguồn thay thế. ⚠ Khi cần nguồn đáng tin, cân nhắc giới hạn nhánh này ở whitelist (docs chính thức, repo gốc).'}
+};
+function crRender(k){
+  var d=CR[k], box=document.getElementById('cr-flow'); box.innerHTML='';
+  d.steps.forEach(function(s){
+    var el=document.createElement('div');
+    el.className='fstep '+(s.v||'on');
+    var pill=s.p?'<span class="verdict-pill '+(s.v==='ok'?'vp-ok':(s.v==='no'?'vp-no':'vp-mid'))+'">'+s.p+'</span>':'';
+    el.innerHTML='<span class="n">'+s.n+'</span><span class="body"><b>'+s.b+'</b><span>'+s.s+'</span>'+pill+'</span>';
+    box.appendChild(el);
+  });
+  document.getElementById('cr-hint').textContent=d.note;
+}
+Array.prototype.forEach.call(document.querySelectorAll('#cr-demo .mode'),function(b){
+  b.addEventListener('click',function(){
+    Array.prototype.forEach.call(document.querySelectorAll('#cr-demo .mode'),function(x){x.classList.remove('on');});
+    b.classList.add('on'); crRender(b.dataset.cr);
+  });
+});
+crRender('hi');
+
+/* quizzes */
+Array.prototype.forEach.call(document.querySelectorAll('.quiz'),function(q){
+  var ans=+q.dataset.answer, opts=[].slice.call(q.querySelectorAll('.opt')), expl=q.querySelector('.expl');
+  opts.forEach(function(o,i){
+    o.addEventListener('click',function(){
+      opts.forEach(function(x,j){x.classList.remove('right','wrong'); if(j===ans)x.classList.add('right');});
+      if(i!==ans)o.classList.add('wrong');
+      expl.classList.add('show');
+    });
+  });
+});
+</script>
+</body>
+</html>

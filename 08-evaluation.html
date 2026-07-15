@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đánh giá & minh bạch: DeepEval, GroUSE, Open-RAG-Eval — Sổ tay RAG</title>
+<style>
+:root{
+  --bg:#F7F8FC; --surface:#FFFFFF; --ink:#16213A; --ink-soft:#4A5570;
+  --line:#DDE2EF; --primary:#3B4CC0; --primary-soft:#E8EBFA;
+  --amber:#B97C1D; --amber-soft:#FBF3E2; --teal:#1F8A70; --teal-soft:#E3F4EF;
+  --rose:#B0455A; --rose-soft:#F9E9ED; --violet:#6B4BA8; --violet-soft:#EFE9F8;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+  --sans:"Be Vietnam Pro","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.7;font-size:16.5px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px}
+a{color:var(--primary)}
+#progress{position:fixed;top:0;left:0;height:3px;background:var(--teal);width:0;z-index:99}
+header{background:var(--ink);color:#EDF0FA;padding:44px 0 34px}
+.crumb{font-family:var(--mono);font-size:.78rem;color:#9FB0E8}
+.crumb a{color:#9FB0E8;text-decoration:none}
+.crumb a:hover{text-decoration:underline}
+header h1{font-size:clamp(1.7rem,4vw,2.4rem);font-weight:800;margin:.5rem 0;letter-spacing:-.02em;line-height:1.2}
+header h1 em{font-style:normal;color:#FFC96B}
+header p{color:#C3CCE8;max-width:660px}
+.rail-panel{background:#101830;padding:14px 0 20px}
+.rail-panel svg{display:block;margin:0 auto}
+nav.toc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:26px auto;max-width:860px}
+nav.toc b{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+nav.toc ol{margin:8px 0 0 20px}
+nav.toc li{padding:2px 0}
+section.tech{padding:36px 0 10px}
+.tech-head{border-left:5px solid var(--teal);padding-left:16px;margin-bottom:20px}
+.tech-head .kicker{font-family:var(--mono);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--teal)}
+.tech-head h2{font-size:1.7rem;font-weight:800}
+.badges{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.badge{font-family:var(--mono);font-size:.68rem;padding:2px 9px;border-radius:99px}
+.lv2{background:var(--amber-soft);color:var(--amber)} .lv3{background:var(--rose-soft);color:var(--rose)}
+.stage{background:var(--teal-soft);color:var(--teal)}
+h3{font-size:1.12rem;font-weight:700;margin:28px 0 8px}
+p{margin-bottom:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0;overflow-x:auto}
+.problem{border-left:4px solid var(--rose);background:var(--rose-soft)}
+.insight{border-left:4px solid var(--teal);background:var(--teal-soft)}
+.problem b,.insight b{display:block;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.problem b{color:var(--rose)} .insight b{color:var(--teal)}
+pre{background:#101830;color:#D9E0F5;font-family:var(--mono);font-size:.82rem;line-height:1.6;padding:16px 18px;border-radius:12px;overflow-x:auto;margin:14px 0}
+pre .c{color:#7A88B8} pre .k{color:#FFC96B} pre .s{color:#8FD3B6}
+code{font-family:var(--mono);font-size:.85em;background:var(--primary-soft);color:var(--primary);padding:1px 6px;border-radius:5px}
+pre code{background:none;color:inherit;padding:0}
+.demo{background:var(--surface);border:2px solid var(--teal);border-radius:14px;padding:20px;margin:18px 0}
+.demo .demo-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--teal);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.demo .demo-tag::before{content:"▶";font-size:.6rem}
+.controls{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;align-items:center}
+button{font-family:var(--sans);font-size:.9rem;padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+button.primary{background:var(--teal);border-color:var(--teal);color:#fff;font-weight:600}
+button.primary:hover{background:#186E58}
+button.mode{border:1.5px solid var(--line)}
+button.mode.on{border-color:var(--teal);background:var(--teal-soft);color:var(--teal);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,select:focus-visible{outline:3px solid #9FB0E8;outline-offset:1px}
+select{font-family:var(--sans);font-size:.9rem;padding:8px 12px;border-radius:9px;border:1px solid var(--line);background:#fff}
+.hint{font-size:.84rem;color:var(--ink-soft);margin-top:8px}
+
+/* metric bars */
+.mrow{display:grid;grid-template-columns:180px 1fr 52px;gap:11px;align-items:center;margin:9px 0;font-size:.86rem}
+.mbar{height:13px;border-radius:7px;background:var(--line);overflow:hidden}
+.mbar i{display:block;height:100%;border-radius:7px;transition:width .5s, background .5s}
+.mval{font-family:var(--mono);font-size:.78rem;text-align:right}
+.mname{cursor:help;border-bottom:1px dotted var(--ink-soft)}
+.mdesc{font-size:.8rem;color:var(--ink-soft);grid-column:1/-1;margin:-4px 0 6px;padding-left:2px}
+
+/* case card */
+.case{border:1.5px solid var(--line);border-radius:11px;padding:14px 16px;background:var(--bg);margin-top:10px;font-size:.88rem}
+.case .lbl{font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);display:block;margin-bottom:3px}
+.case .txt{margin-bottom:10px}
+.case .txt:last-child{margin-bottom:0}
+.verdict{border-radius:9px;padding:10px 13px;margin-top:12px;font-size:.87rem;border:1.5px solid}
+.verdict.pass{background:var(--teal-soft);border-color:var(--teal)}
+.verdict.fail{background:var(--rose-soft);border-color:var(--rose)}
+.verdict b{display:block;font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px}
+.verdict.pass b{color:var(--teal)} .verdict.fail b{color:var(--rose)}
+
+/* grouse pills */
+.pill-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-top:12px}
+.gpill{border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;font-size:.84rem;transition:all .3s;cursor:pointer}
+.gpill:hover{border-color:var(--teal)}
+.gpill.on{border-color:var(--teal);background:var(--teal-soft)}
+.gpill b{display:block;font-size:.88rem;margin-bottom:2px}
+.gpill span{color:var(--ink-soft);font-size:.78rem}
+.gdetail{margin-top:12px;border-radius:10px;padding:13px 15px;background:var(--teal-soft);border:1.5px solid var(--teal);font-size:.87rem;min-height:60px}
+
+/* nugget demo */
+.nug-list{list-style:none;margin-top:10px}
+.nug-list li{display:grid;grid-template-columns:26px 1fr 80px;gap:10px;align-items:center;border:1.5px solid var(--line);border-radius:9px;padding:8px 12px;margin-bottom:6px;background:var(--bg);font-size:.85rem;transition:all .35s}
+.nug-list li.hit{border-color:var(--teal);background:var(--teal-soft)}
+.nug-list li.miss{border-color:var(--rose);background:var(--rose-soft);opacity:.75}
+.nug-list .v{font-family:var(--mono);font-size:.72rem;text-align:right}
+.nug-list .n{font-family:var(--mono);font-size:.72rem;color:var(--ink-soft)}
+.score-big{font-family:var(--mono);font-size:1.5rem;font-weight:800;color:var(--teal)}
+
+/* explainable */
+.exp-doc{border:1.5px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--bg);font-size:.87rem;margin-top:10px}
+.exp-why{font-size:.83rem;background:var(--violet-soft);border-left:3px solid var(--violet);border-radius:0 8px 8px 0;padding:8px 12px;margin-top:8px;max-height:0;opacity:0;overflow:hidden;transition:max-height .4s, opacity .4s, padding .4s, margin .4s}
+.exp-why.show{max-height:140px;opacity:1;padding:8px 12px;margin-top:8px}
+.exp-why b{color:var(--violet);font-family:var(--mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:3px}
+
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.duo .col{border-radius:12px;padding:16px 18px}
+.duo .yes{background:var(--teal-soft);border:1px solid #BADFD2}
+.duo .no{background:var(--rose-soft);border:1px solid #EBC6CE}
+.duo h4{font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.duo .yes h4{color:var(--teal)} .duo .no h4{color:var(--rose)}
+.duo ul{margin-left:18px;font-size:.9rem}
+.duo li{margin-bottom:6px}
+@media (max-width:620px){.duo{grid-template-columns:1fr}.mrow{grid-template-columns:120px 1fr 42px}}
+.quiz{background:var(--amber-soft);border:1px solid #EAD9B4;border-radius:14px;padding:20px;margin:20px 0}
+.quiz .q-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:8px}
+.quiz p.q{font-weight:600;margin-bottom:10px}
+.quiz .opts{display:flex;flex-direction:column;gap:8px}
+.quiz .opt{text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:9px 13px;font-size:.92rem;cursor:pointer}
+.quiz .opt:hover{border-color:var(--amber)}
+.quiz .opt.right{border-color:var(--teal);background:var(--teal-soft)}
+.quiz .opt.wrong{border-color:var(--rose);background:var(--rose-soft)}
+.quiz .expl{display:none;margin-top:10px;font-size:.88rem;background:#fff;border-radius:9px;padding:10px 13px}
+.quiz .expl.show{display:block}
+table{width:100%;border-collapse:collapse;background:var(--surface);font-size:.88rem}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--ink);color:#EDF0FA;font-size:.76rem;text-transform:uppercase;letter-spacing:.05em}
+.table-scroll{overflow-x:auto;border-radius:12px;border:1px solid var(--line);margin:14px 0}
+.summary{background:var(--ink);color:#D9E0F5;border-radius:14px;padding:24px;margin:30px 0}
+.summary h3{color:#FFC96B;margin-top:0}
+.summary ul{margin-left:20px}
+.summary li{margin-bottom:8px}
+.finale{background:linear-gradient(135deg,#16213A,#2A2050);color:#EDF0FA;border-radius:16px;padding:30px 26px;margin:30px 0}
+.finale h3{color:#FFC96B;font-size:1.3rem;margin-bottom:10px}
+.finale p{color:#C3CCE8}
+.finale ol{margin:12px 0 0 20px;color:#D9E0F5}
+.finale li{margin-bottom:7px}
+.finale a{color:#9FB0E8}
+.nav-next{display:flex;justify-content:space-between;gap:12px;padding:10px 0 50px;flex-wrap:wrap}
+.nav-next a{text-decoration:none;font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 18px}
+.nav-next a:hover{border-color:var(--primary)}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<header>
+  <div class="wrap">
+    <div class="crumb"><a href="index.html">← Trang tổng quan</a> · Nhóm Đánh giá & minh bạch · Batch 7 (cuối)</div>
+    <h1>Đánh giá & minh bạch — <em>trọng tài</em> của cả sổ tay</h1>
+    <p>Suốt sáu batch, mỗi bài đều kết bằng cùng một câu: <i>"phải đo bằng eval"</i>. Đây là batch trả lời câu hỏi đó. Không có bộ đánh giá, mọi kỹ thuật ở trên chỉ là phỏng đoán có học thức — bạn không biết Reranking có thực sự giúp gì, hay HyDE đang âm thầm làm hỏng truy vấn chứa mã số.</p>
+  </div>
+</header>
+
+<div class="rail-panel">
+  <svg viewBox="0 0 760 62" width="100%" style="max-width:820px" role="img" aria-label="Đánh giá bao trùm và phản hồi về mọi giai đoạn">
+    <line x1="20" y1="34" x2="740" y2="34" stroke="#2A3560" stroke-width="2"/>
+    <g font-size="11" text-anchor="middle">
+      <circle cx="80" cy="34" r="7" fill="#2A3560"/><text x="80" y="56" fill="#6C7BB0">Lập chỉ mục</text>
+      <circle cx="240" cy="34" r="7" fill="#2A3560"/><text x="240" y="56" fill="#6C7BB0">Truy vấn</text>
+      <circle cx="400" cy="34" r="10" fill="#FFC96B"/><text x="400" y="56" fill="#FFC96B" font-weight="700">Truy xuất</text>
+      <circle cx="560" cy="34" r="7" fill="#2A3560"/><text x="560" y="56" fill="#6C7BB0">Hậu xử lý</text>
+      <circle cx="700" cy="34" r="10" fill="#FFC96B"/><text x="700" y="56" fill="#FFC96B" font-weight="700">Sinh</text>
+    </g>
+    <path d="M700 20 C 600 -6, 180 -6, 80 20" fill="none" stroke="#5BC0A0" stroke-width="1.8" stroke-dasharray="5 4"/>
+    <text x="390" y="8" text-anchor="middle" font-size="10.5" fill="#5BC0A0">eval đo mọi khâu và quyết định thay đổi nào được giữ lại</text>
+  </svg>
+</div>
+
+<nav class="toc wrap">
+  <b>Trong bài này</b>
+  <ol>
+    <li><a href="#twohalves">Nguyên tắc nền: RAG có hai nửa cần đo riêng</a></li>
+    <li><a href="#deepeval">DeepEval</a> — test case cho RAG</li>
+    <li><a href="#e2e">End-to-End RAG Evaluation</a> — lắp bộ eval hoàn chỉnh</li>
+    <li><a href="#grouse">GroUSE</a> — 6 metric + meta-eval cho LLM judge</li>
+    <li><a href="#openrag">Open-RAG-Eval</a> — UMBRELA & AutoNuggetizer</li>
+    <li><a href="#explain">Explainable Retrieval</a> — minh bạch vì sao đoạn này được chọn</li>
+    <li><a href="#compare">Tổng kết & lời kết cho cả sổ tay</a></li>
+  </ol>
+</nav>
+
+<!-- ================= TWO HALVES ================= -->
+<section class="tech" id="twohalves">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Nguyên tắc nền</div>
+      <h2>RAG có hai nửa — đo lẫn lộn là mù</h2>
+    </div>
+
+    <div class="panel insight">
+      <b>Khung tư duy quan trọng nhất của batch này</b>
+      Một câu trả lời RAG tệ có thể do <b>truy xuất</b> (lấy sai tài liệu) hoặc do <b>sinh</b> (có tài liệu đúng nhưng LLM trả lời sai/bịa thêm). Hai nguyên nhân này cần <i>hai bộ metric khác nhau</i>. Chỉ chấm "câu trả lời cuối tốt không?" là mù — bạn biết có vấn đề nhưng không biết sửa ở đâu.
+    </div>
+
+    <div class="panel">
+      <svg viewBox="0 0 780 220" width="100%" style="min-width:620px" role="img" aria-label="Hai nửa của đánh giá RAG">
+        <defs><marker id="ea" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4A5570"/></marker></defs>
+        <rect x="20" y="26" width="350" height="164" rx="12" fill="#E8EBFA" stroke="#3B4CC0" stroke-dasharray="6 4"/>
+        <text x="195" y="50" text-anchor="middle" font-size="13" font-weight="800" fill="#3B4CC0">NỬA 1 · TRUY XUẤT</text>
+        <text x="195" y="68" text-anchor="middle" font-size="10.5" fill="#4A5570">"Có lấy đúng tài liệu không?"</text>
+        <g font-size="11" fill="#16213A">
+          <text x="44" y="96" font-weight="700">Context Precision</text><text x="44" y="111" font-size="10" fill="#4A5570">tài liệu lấy về có liên quan không?</text>
+          <text x="44" y="136" font-weight="700">Context Recall</text><text x="44" y="151" font-size="10" fill="#4A5570">có bỏ sót tài liệu cần thiết không?</text>
+          <text x="44" y="176" font-size="10" fill="#B0455A">Kém ở đây → sửa chunking, fusion, HyDE, rerank</text>
+        </g>
+
+        <rect x="410" y="26" width="350" height="164" rx="12" fill="#E3F4EF" stroke="#1F8A70" stroke-dasharray="6 4"/>
+        <text x="585" y="50" text-anchor="middle" font-size="13" font-weight="800" fill="#1F8A70">NỬA 2 · SINH</text>
+        <text x="585" y="68" text-anchor="middle" font-size="10.5" fill="#4A5570">"Có dùng đúng tài liệu đó không?"</text>
+        <g font-size="11" fill="#16213A">
+          <text x="434" y="96" font-weight="700">Faithfulness</text><text x="434" y="111" font-size="10" fill="#4A5570">câu trả lời có bịa ngoài tài liệu không?</text>
+          <text x="434" y="136" font-weight="700">Answer Relevancy</text><text x="434" y="151" font-size="10" fill="#4A5570">có trả lời đúng câu hỏi không?</text>
+          <text x="434" y="176" font-size="10" fill="#B0455A">Kém ở đây → sửa prompt, model, compression</text>
+        </g>
+        <line x1="370" y1="108" x2="406" y2="108" stroke="#4A5570" stroke-width="1.6" marker-end="url(#ea)"/>
+        <text x="390" y="212" text-anchor="middle" font-size="11.5" fill="#4A5570">Chẩn đoán trước, kê thuốc sau — cùng logic "recall kém vs precision kém" ở bài Reranking.</text>
+      </svg>
+    </div>
+
+    <div class="quiz" data-answer="0">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Context Recall = 0.9 (truy xuất tốt) nhưng Faithfulness = 0.4 (câu trả lời bịa nhiều). Nên sửa gì?</p>
+      <div class="opts">
+        <button class="opt">Sửa nửa Sinh — tài liệu đúng đã có sẵn trong ngữ cảnh, vấn đề là LLM không bám vào nó. Chỉnh prompt (ép trích dẫn), đổi model, hoặc nén bớt nhiễu</button>
+        <button class="opt">Thêm Fusion Retrieval để tăng recall</button>
+        <button class="opt">Thêm Reranking</button>
+      </div>
+      <div class="expl">Recall 0.9 nghĩa là tài liệu đúng <b>đã nằm trong ngữ cảnh</b> rồi — thêm Fusion hay Rerank chỉ tối ưu thứ vốn đã tốt. Faithfulness thấp là bệnh của nửa Sinh: LLM có tài liệu mà vẫn bịa. Thuốc: prompt ép trích dẫn nguồn, model mạnh hơn, hoặc Contextual Compression để cắt nhiễu làm LLM tập trung. Đây chính là giá trị của việc đo hai nửa riêng.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= DEEPEVAL ================= -->
+<section class="tech" id="deepeval">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 1/5</div>
+      <h2>DeepEval — test case cho RAG</h2>
+      <div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge stage">Đánh giá</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Kiểm thử RAG bằng cách "hỏi thử vài câu rồi đọc xem có ổn không" không mở rộng được, không lặp lại được, và không phát hiện <b>hồi quy</b> — bạn sửa chunking cho câu hỏi A tốt lên, vô tình làm hỏng câu hỏi B mà chẳng ai biết.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Đối xử với chất lượng RAG như <b>unit test</b>: mỗi test case gồm câu hỏi, ngữ cảnh truy xuất được, câu trả lời, và (tùy chọn) đáp án chuẩn. Chạy các metric tự động — correctness, faithfulness, contextual relevancy — và <b>đặt ngưỡng đạt/trượt</b>. Tích hợp vào CI: pipeline hỏng thì build đỏ.
+    </div>
+
+    <div class="demo" id="de-demo">
+      <div class="demo-tag">Demo mô phỏng — chạy test case</div>
+      <div class="controls">
+        <label style="font-size:.88rem">Chọn tình huống:
+          <select id="de-case">
+            <option value="good">Trả lời tốt, bám tài liệu</option>
+            <option value="halluc">Trả lời bịa thêm chi tiết ngoài tài liệu</option>
+            <option value="badctx">Truy xuất lấy sai tài liệu</option>
+          </select>
+        </label>
+      </div>
+      <div class="case" id="de-case-box"></div>
+      <div style="margin-top:14px" id="de-metrics"></div>
+      <div class="verdict pass" id="de-verdict"></div>
+    </div>
+
+<pre><code><span class="k">from</span> deepeval.metrics <span class="k">import</span> FaithfulnessMetric, ContextualRelevancyMetric
+
+test_case = LLMTestCase(
+    input=<span class="s">"Timeout mặc định của connection pool là bao nhiêu?"</span>,
+    actual_output=answer,               <span class="c"># câu trả lời hệ thống sinh ra</span>
+    retrieval_context=retrieved_docs,   <span class="c"># tài liệu đã truy xuất</span>
+)
+assert_test(test_case, [
+    FaithfulnessMetric(threshold=0.8),          <span class="c"># đo nửa SINH</span>
+    ContextualRelevancyMetric(threshold=0.7),   <span class="c"># đo nửa TRUY XUẤT</span>
+])   <span class="c"># chạy trong CI — dưới ngưỡng là build đỏ</span></code></pre>
+  </div>
+</section>
+
+<!-- ================= E2E ================= -->
+<section class="tech" id="e2e">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 2/5</div>
+      <h2>End-to-End RAG Evaluation</h2>
+      <div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge stage">Đánh giá</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Biết các metric tồn tại là một chuyện; <b>lắp chúng thành quy trình dùng được</b> lại là chuyện khác. Bộ dữ liệu test lấy ở đâu? Chọn metric nào? Ai chấm điểm? Bao lâu chạy một lần?
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi — quy trình 4 bước</b>
+      (1) <b>Dựng bộ test</b> — câu hỏi + đáp án chuẩn, có thể sinh tự động từ chính kho tài liệu. (2) <b>Chọn tiêu chí</b> theo mục tiêu sản phẩm. (3) <b>LLM-as-judge</b> chấm điểm tự động thay con người. (4) <b>Chạy lặp</b> mỗi lần thay đổi pipeline, so sánh với baseline. RAGAS là bộ khung phổ biến gói sẵn các metric này.
+    </div>
+
+    <div class="panel">
+      <svg viewBox="0 0 780 176" width="100%" style="min-width:620px" role="img" aria-label="Quy trình đánh giá end-to-end">
+        <defs><marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4A5570"/></marker></defs>
+        <g font-size="12" font-weight="700" text-anchor="middle" fill="#16213A">
+          <rect x="14" y="46" width="156" height="52" rx="10" fill="#E3F4EF" stroke="#1F8A70"/>
+          <text x="92" y="68">① Dựng bộ test</text><text x="92" y="85" font-weight="400" font-size="10" fill="#4A5570">sinh Q&amp;A từ kho</text>
+          <rect x="210" y="46" width="156" height="52" rx="10" fill="#E8EBFA" stroke="#3B4CC0"/>
+          <text x="288" y="68">② Chọn tiêu chí</text><text x="288" y="85" font-weight="400" font-size="10" fill="#4A5570">theo mục tiêu SP</text>
+          <rect x="406" y="46" width="156" height="52" rx="10" fill="#FBF3E2" stroke="#B97C1D"/>
+          <text x="484" y="68">③ LLM-as-judge</text><text x="484" y="85" font-weight="400" font-size="10" fill="#4A5570">chấm tự động</text>
+          <rect x="602" y="46" width="162" height="52" rx="10" fill="#EFE9F8" stroke="#6B4BA8"/>
+          <text x="683" y="68">④ Chạy lặp</text><text x="683" y="85" font-weight="400" font-size="10" fill="#4A5570">so với baseline</text>
+        </g>
+        <g stroke="#4A5570" stroke-width="1.6">
+          <line x1="170" y1="72" x2="206" y2="72" marker-end="url(#fa)"/>
+          <line x1="366" y1="72" x2="402" y2="72" marker-end="url(#fa)"/>
+          <line x1="562" y1="72" x2="598" y2="72" marker-end="url(#fa)"/>
+        </g>
+        <path d="M683 102 C 683 138, 92 138, 92 102" fill="none" stroke="#6B4BA8" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#fa)"/>
+        <text x="390" y="150" text-anchor="middle" font-size="11" fill="#6B4BA8">Mỗi thay đổi pipeline (thêm rerank? đổi chunk size?) chạy lại vòng này — số liệu quyết định giữ hay bỏ.</text>
+      </svg>
+    </div>
+
+    <div class="quiz" data-answer="1">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Vì sao bước "dựng bộ test" thường được sinh <b>từ chính kho tài liệu của bạn</b> thay vì dùng benchmark công khai?</p>
+      <div class="opts">
+        <button class="opt">Vì benchmark công khai quá đắt</button>
+        <button class="opt">Vì chất lượng RAG phụ thuộc <i>kho cụ thể</i> của bạn — điểm cao trên benchmark chung không nói lên gì về việc hệ thống hoạt động ra sao trên tài liệu tiếng Việt của bạn</button>
+        <button class="opt">Vì benchmark công khai không có tiếng Việt</button>
+      </div>
+      <div class="expl">Đây là điểm dễ bị bỏ qua nhất. RAG không phải mô hình chung — nó là hệ thống gắn chặt với <b>kho tài liệu cụ thể</b>. Một pipeline đạt điểm cao trên benchmark tiếng Anh có thể sụp đổ trên corpus của bạn vì tokenize khác, cấu trúc tài liệu khác, kiểu câu hỏi khác. Bộ test phải sinh từ chính kho bạn phục vụ.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= GROUSE ================= -->
+<section class="tech" id="grouse">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 3/5</div>
+      <h2>GroUSE — 6 metric & meta-đánh giá</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage">Đánh giá</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Hai vấn đề chồng nhau. Thứ nhất, "faithfulness" một chiều quá thô — một câu trả lời có thể vừa đúng vừa thiếu, vừa bám nguồn vừa lạc đề. Thứ hai, và sâu hơn: <b>ai chấm điểm cho người chấm điểm?</b> Nếu dùng LLM-as-judge, làm sao biết judge đó chấm đúng?
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      GroUSE đề xuất <b>6 chiều đánh giá</b> cho "sinh có căn cứ" (grounded generation), tách bạch các cách một câu trả lời có thể hỏng. Quan trọng hơn: nó cung cấp <b>meta-evaluation</b> — một bộ test <i>cho chính LLM judge</i>, với các trường hợp bẫy đã biết đáp án, để đo xem judge của bạn có đáng tin không.
+    </div>
+
+    <div class="demo" id="gr-demo">
+      <div class="demo-tag">Demo mô phỏng — 6 chiều đánh giá (nhấn để xem)</div>
+      <div class="pill-grid" id="gr-pills"></div>
+      <div class="gdetail" id="gr-detail">Nhấn vào một chiều để xem nó bắt lỗi gì.</div>
+    </div>
+
+    <div class="panel insight">
+      <b>Meta-evaluation — vòng lặp lùi một bước</b>
+      Ý tưởng đắt giá nhất của GroUSE: <b>LLM judge cũng là một hệ thống cần đánh giá</b>. Bạn cho judge chấm các trường hợp đã biết đáp án (unit test cho judge). Nếu judge không phân biệt nổi câu trả lời bịa với câu trả lời có căn cứ, thì mọi số liệu eval của bạn <i>vô nghĩa</i> — và bạn đang tối ưu pipeline dựa trên nhiễu.
+    </div>
+
+    <div class="quiz" data-answer="2">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Vì sao meta-evaluation lại quan trọng đến vậy?</p>
+      <div class="opts">
+        <button class="opt">Vì nó làm eval chạy nhanh hơn</button>
+        <button class="opt">Vì nó thay thế được LLM judge</button>
+        <button class="opt">Vì mọi quyết định kỹ thuật của bạn đều dựa trên số liệu eval — nếu judge sai, bạn đang tối ưu theo nhiễu mà vẫn tưởng mình đang tiến bộ</button>
+      </div>
+      <div class="expl">Cả sổ tay này xây trên tiền đề "eval quyết định". Nhưng eval bằng LLM judge nghĩa là <b>một LLM đang chấm một LLM</b> — nếu judge thiên lệch (thích câu dài, bị lừa bởi văn phong tự tin), bạn sẽ vô tình chọn những kỹ thuật <i>làm hài lòng judge</i> chứ không phải làm tốt cho người dùng. Meta-eval là cách kiểm tra chính cái thước bạn đang dùng.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= OPEN RAG EVAL ================= -->
+<section class="tech" id="openrag">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 4/5</div>
+      <h2>Open-RAG-Eval — UMBRELA & AutoNuggetizer</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage">Đánh giá</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Hầu hết metric cần <b>đáp án chuẩn (ground truth)</b> do người viết — cực đắt và không mở rộng nổi. Ngoài ra, chấm một câu trả lời dài bằng "một điểm số tổng thể" che mất chi tiết: nó nêu đủ 4/5 ý quan trọng hay chỉ 1/5?
+    </div>
+
+    <div class="panel insight">
+      <b>Hai ý tưởng lõi</b>
+      <b>UMBRELA</b>: dùng LLM chấm độ liên quan của tài liệu theo thang chuẩn, thay cho người gán nhãn — mở rộng được việc đánh giá nửa truy xuất. <b>AutoNuggetizer</b>: tách câu trả lời chuẩn thành các <b>"nugget"</b> (mẩu thông tin nguyên tử phải có), rồi kiểm tra câu trả lời của hệ thống <i>phủ được bao nhiêu nugget</i>. Chấm theo mẩu thay vì cảm tính tổng thể.
+    </div>
+
+    <div class="demo" id="nug-demo">
+      <div class="demo-tag">Demo mô phỏng — AutoNuggetizer chấm theo mẩu</div>
+      <p style="font-size:.9rem">Câu hỏi: <span style="font-family:var(--mono);background:var(--teal-soft);color:var(--teal);padding:1px 7px;border-radius:6px">"Cách cấu hình retry cho HTTP client?"</span></p>
+      <div class="controls" role="group">
+        <button class="mode on" data-nug="a">Câu trả lời A (đầy đủ)</button>
+        <button class="mode" data-nug="b">Câu trả lời B (thiếu ý)</button>
+      </div>
+      <div class="case"><span class="lbl">Câu trả lời hệ thống sinh ra</span><div class="txt" id="nug-answer"></div></div>
+      <div style="font-family:var(--mono);font-size:.74rem;color:var(--ink-soft);margin-top:12px;letter-spacing:.06em;text-transform:uppercase">Các nugget cần phủ (tách từ đáp án chuẩn)</div>
+      <ul class="nug-list" id="nug-list"></ul>
+      <div class="hint" id="nug-hint"></div>
+    </div>
+
+    <div class="quiz" data-answer="0">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Ưu điểm của chấm theo nugget so với "cho một điểm tổng thể" là gì?</p>
+      <div class="opts">
+        <button class="opt">Nó chỉ ra <b>chính xác ý nào bị thiếu</b> — biến điểm số thành thông tin sửa được, thay vì chỉ biết "câu trả lời hơi kém"</button>
+        <button class="opt">Nó chạy nhanh hơn</button>
+        <button class="opt">Nó không cần LLM</button>
+      </div>
+      <div class="expl">Điểm 0.6 tổng thể không cho bạn biết phải làm gì. "Phủ 3/5 nugget, thiếu ý về backoff và loại lỗi được retry" thì hành động được ngay — có thể là chunking cắt mất phần đó, hoặc top-k quá nhỏ. Cùng tinh thần với việc tách hai nửa truy xuất/sinh: <b>metric phải chỉ đường, không chỉ chấm điểm</b>.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= EXPLAINABLE ================= -->
+<section class="tech" id="explain">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 5/5</div>
+      <h2>Explainable Retrieval</h2>
+      <div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge stage">Minh bạch</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Vector search là hộp đen: nó trả về "cosine 0.83" mà không nói <i>vì sao</i>. Khi kết quả sai, kỹ sư không biết debug từ đâu. Và với người dùng cuối, một câu trả lời không chỉ ra được nguồn gốc là câu trả lời khó tin tưởng để hành động theo.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Cùng với mỗi tài liệu truy xuất, sinh một <b>lời giải thích ngắn</b>: đoạn này liên quan tới truy vấn ở điểm nào. Hai lợi ích tách biệt: <b>debug</b> (kỹ sư thấy ngay hệ thống "hiểu" truy vấn thế nào) và <b>tin cậy</b> (người dùng kiểm chứng được thay vì phải tin mù).
+    </div>
+
+    <div class="demo" id="exp-demo">
+      <div class="demo-tag">Demo mô phỏng — bật lời giải thích</div>
+      <p style="font-size:.9rem">Truy vấn: <span style="font-family:var(--mono);background:var(--teal-soft);color:var(--teal);padding:1px 7px;border-radius:6px">"khi rollback thì dữ liệu đã ghi có bị mất không?"</span></p>
+      <div class="controls" role="group">
+        <button class="mode on" data-exp="off">Chỉ điểm số</button>
+        <button class="mode" data-exp="on">Kèm lời giải thích</button>
+      </div>
+      <div id="exp-docs"></div>
+      <div class="hint" id="exp-hint"></div>
+    </div>
+
+    <div class="duo">
+      <div class="col yes"><h4>Nên dùng khi</h4><ul>
+        <li>Bối cảnh cần kiểm toán: hướng dẫn vận hành, quyết định ảnh hưởng production.</li>
+        <li>Đang debug pipeline — lời giải thích lộ ra ngay hệ thống hiểu sai truy vấn ở đâu.</li>
+        <li>Người dùng cần tự kiểm chứng trước khi hành động theo câu trả lời.</li>
+      </ul></div>
+      <div class="col no"><h4>Không nên / lưu ý</h4><ul>
+        <li>Tốn thêm LLM call cho mỗi tài liệu — cân nhắc chỉ bật ở chế độ debug hoặc khi người dùng yêu cầu.</li>
+        <li>⚠ Lời giải thích do LLM sinh <i>sau khi đã truy xuất</i> — nó là lời <b>diễn giải hợp lý hóa</b>, không phải cơ chế thật bên trong vector search. Đừng nhầm nó với "sự thật về vì sao model chọn".</li>
+      </ul></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPARE + FINALE ================= -->
+<section class="tech" id="compare">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Tổng kết nhóm</div>
+      <h2>So sánh 5 công cụ đánh giá</h2>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Công cụ</th><th>Đo nửa nào</th><th>Cần ground truth?</th><th>Dùng khi</th></tr></thead>
+      <tbody>
+        <tr><td><b>DeepEval</b></td><td>Cả hai</td><td>Tùy metric</td><td>Đưa eval vào CI, chặn hồi quy</td></tr>
+        <tr><td><b>End-to-End Eval</b></td><td>Cả hai</td><td>Có (sinh tự động được)</td><td>Quy trình nền — bắt đầu từ đây</td></tr>
+        <tr><td><b>GroUSE</b></td><td>Sinh (6 chiều) + meta</td><td>Có (cho meta-eval)</td><td>Khi cần tin vào chính LLM judge</td></tr>
+        <tr><td><b>Open-RAG-Eval</b></td><td>Cả hai</td><td>Giảm phụ thuộc (UMBRELA)</td><td>Kho lớn, không đủ nhãn người</td></tr>
+        <tr><td><b>Explainable Retrieval</b></td><td>Truy xuất (định tính)</td><td>Không</td><td>Debug + miền cần kiểm toán</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="summary">
+      <h3>Ghi nhớ 5 điều</h3>
+      <ul>
+        <li><b>Hai nửa</b>: đo truy xuất (precision/recall ngữ cảnh) và sinh (faithfulness/relevancy) riêng biệt — nếu không, biết hỏng mà không biết sửa đâu.</li>
+        <li>Bộ test phải sinh từ <b>chính kho của bạn</b> — điểm cao trên benchmark chung không nói gì về corpus tiếng Việt của bạn.</li>
+        <li><b>Meta-evaluation</b>: LLM judge cũng cần được đánh giá. Judge sai = tối ưu theo nhiễu.</li>
+        <li>Metric tốt <b>chỉ đường</b>, không chỉ chấm điểm — nugget nói "thiếu ý nào", tổng điểm chỉ nói "hơi kém".</li>
+        <li>Explainable Retrieval là lời <i>diễn giải hợp lý hóa</i>, hữu ích để debug và tạo tin cậy — nhưng không phải cơ chế thật bên trong.</li>
+      </ul>
+    </div>
+
+    <div class="finale">
+      <h3>🎓 Hết 35/35 — lời kết cho cả sổ tay</h3>
+      <p>Bảy batch, 35 kỹ thuật, và một sợi chỉ xuyên suốt: <b>chẩn đoán trước, kê thuốc sau, đo lại để biết thuốc có tác dụng</b>.</p>
+      <ol>
+        <li><b>Đừng học theo danh sách — học theo triệu chứng.</b> Ma trận trên <a href="index.html#matrix">trang tổng quan</a> là cách kỹ sư thật sự chọn kỹ thuật.</li>
+        <li><b>Rẻ trước, đắt sau.</b> Query Transformations rẻ hơn Fusion, Fusion rẻ hơn RAPTOR, RAPTOR rẻ hơn Agentic RAG. Leo thang chỉ khi eval chứng minh cần.</li>
+        <li><b>Mọi kỹ thuật đều là đánh đổi index-time vs query-time.</b> HyDE/HyPE, Augmentation, RAPTOR — cùng ý tưởng, khác chỗ trả tiền.</li>
+        <li><b>Recall kém sửa truy xuất; precision kém thêm rerank; faithfulness kém sửa sinh.</b> Ba câu này giải quyết phần lớn vấn đề thực tế.</li>
+        <li><b>Bắt đầu từ batch này, không phải kết thúc.</b> Bộ eval nên là thứ bạn dựng <i>trước</i> khi thử kỹ thuật thứ hai — nếu không, bạn không bao giờ biết mình đang tiến hay lùi.</li>
+      </ol>
+      <p style="margin-top:14px;font-size:.9rem">Nguồn gốc: <a href="https://github.com/NirDiamant/RAG_Techniques" target="_blank" rel="noopener">NirDiamant/RAG_Techniques</a> — sổ tay này diễn giải lại, không thay thế notebook gốc. Muốn cài đặt thật, hãy đọc code ở repo.</p>
+    </div>
+
+    <div class="nav-next">
+      <a href="07-advanced-architectures.html">← Xem lại: Kiến trúc nâng cao</a>
+      <a href="index.html">Trang tổng quan →</a>
+    </div>
+  </div>
+</section>
+
+<script>
+addEventListener('scroll',function(){
+  var h=document.documentElement;
+  document.getElementById('progress').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';
+},{passive:true});
+
+/* ---------- DeepEval ---------- */
+var DE={
+ good:{
+  ctx:'Mục 4.2 — Cấu hình connection pool: timeout mặc định là 30 giây cho kết nối idle, 10 giây cho lúc thiết lập kết nối.',
+  ans:'Theo Mục 4.2, timeout mặc định là 30 giây với kết nối idle và 10 giây khi thiết lập kết nối.',
+  m:{'Contextual Relevancy':0.92,'Faithfulness':0.96,'Answer Relevancy':0.94},
+  pass:true,
+  note:'Cả 3 metric vượt ngưỡng. Câu trả lời bám sát tài liệu, không thêm bớt, trả lời đúng trọng tâm. ✔ Test PASS.'},
+ halluc:{
+  ctx:'Mục 4.2 — Cấu hình connection pool: timeout mặc định là 30 giây cho kết nối idle, 10 giây cho lúc thiết lập kết nối.',
+  ans:'Timeout mặc định là 30 giây với kết nối idle và 10 giây khi thiết lập. <b style="color:#B0455A">Giá trị này áp dụng từ bản 3.0 và sẽ giảm còn 15 giây ở bản 4.0 theo lộ trình.</b>',
+  m:{'Contextual Relevancy':0.90,'Faithfulness':0.35,'Answer Relevancy':0.88},
+  pass:false,
+  note:'⚠ Faithfulness 0.35 — TRƯỢT. Truy xuất tốt (0.90), câu trả lời đúng trọng tâm (0.88), nhưng phần in đỏ HOÀN TOÀN không có trong tài liệu — LLM tự bịa lộ trình phiên bản. Đây là bệnh nửa SINH: sửa prompt (ép chỉ dùng thông tin trong ngữ cảnh), không phải sửa truy xuất.'},
+ badctx:{
+  ctx:'Mục 12 — Hướng dẫn khởi tạo connection pool lần đầu: gọi Pool.init() và truyền chuỗi kết nối...',
+  ans:'Để khởi tạo connection pool, bạn gọi Pool.init() và truyền vào chuỗi kết nối.',
+  m:{'Contextual Relevancy':0.28,'Faithfulness':0.95,'Answer Relevancy':0.22},
+  pass:false,
+  note:'⚠ Contextual Relevancy 0.28 — TRƯỢT. Nghịch lý đáng chú ý: Faithfulness rất cao (0.95) vì LLM bám sát tài liệu một cách trung thực — nhưng bám sát NHẦM tài liệu. Truy xuất lấy về hướng dẫn khởi tạo thay vì giá trị timeout. Đây là bệnh nửa TRUY XUẤT: sửa chunking/fusion/rerank. Nếu chỉ đo Faithfulness, bạn sẽ tưởng mọi thứ ổn.'}
+};
+function deRender(){
+  var k=document.getElementById('de-case').value, d=DE[k];
+  document.getElementById('de-case-box').innerHTML=
+    '<span class="lbl">Câu hỏi</span><div class="txt">Timeout mặc định của connection pool là bao nhiêu?</div>'+
+    '<span class="lbl">Ngữ cảnh truy xuất được</span><div class="txt">'+d.ctx+'</div>'+
+    '<span class="lbl">Câu trả lời hệ thống sinh ra</span><div class="txt">'+d.ans+'</div>';
+  var box=document.getElementById('de-metrics'); box.innerHTML='';
+  Object.keys(d.m).forEach(function(name){
+    var v=d.m[name], col=v>=0.7?'#1F8A70':'#B0455A';
+    var row=document.createElement('div'); row.className='mrow';
+    row.innerHTML='<span>'+name+'</span><span class="mbar"><i style="width:'+(v*100)+'%;background:'+col+'"></i></span><span class="mval" style="color:'+col+'">'+v.toFixed(2)+'</span>';
+    box.appendChild(row);
+  });
+  var v=document.getElementById('de-verdict');
+  v.className='verdict '+(d.pass?'pass':'fail');
+  v.innerHTML='<b>'+(d.pass?'✔ Test Pass':'✗ Test Fail')+'</b>'+d.note;
+}
+document.getElementById('de-case').addEventListener('change',deRender);
+deRender();
+
+/* ---------- GroUSE ---------- */
+var GR=[
+ {t:'Answer relevancy',s:'Có trả lời đúng câu hỏi?',d:'Bắt lỗi: câu trả lời đúng sự thật, bám nguồn, nhưng <b>lạc trọng tâm</b> — hỏi mức đóng lại trả lời thủ tục đăng ký. Đây là chiều bị bỏ sót nhiều nhất khi người ta chỉ đo faithfulness.'},
+ {t:'Completeness',s:'Có nêu đủ ý cần thiết?',d:'Bắt lỗi: câu trả lời <b>đúng nhưng thiếu</b> — nêu điều kiện hưởng mà quên mức hưởng. Không có chiều này, một câu trả lời nửa vời vẫn đạt điểm cao.'},
+ {t:'Faithfulness',s:'Có bịa ngoài nguồn không?',d:'Bắt lỗi kinh điển: LLM thêm chi tiết <b>không có trong tài liệu</b> — con số, ngày tháng, lộ trình tự chế. Nghe rất thuyết phục, nên nguy hiểm nhất.'},
+ {t:'Usefulness',s:'Có thực sự hữu ích cho người hỏi?',d:'Bắt lỗi: câu trả lời <b>kỹ thuật đúng nhưng vô dụng</b> — dán nguyên khối tham chiếu API rối rắm mà không diễn giải, người dùng đọc xong vẫn không biết phải gõ lệnh gì.'},
+ {t:'Positive acceptance',s:'Có trả lời khi ĐÁNG trả lời?',d:'Bắt lỗi ngược: hệ thống <b>quá dè dặt</b> — có đủ tài liệu để trả lời mà vẫn nói "không đủ thông tin". Reliable RAG chỉnh quá tay sẽ mắc lỗi này.'},
+ {t:'Negative rejection',s:'Có từ chối khi ĐÁNG từ chối?',d:'Bắt lỗi: hệ thống <b>trả lời liều</b> khi kho không có dữ liệu. Cặp đôi với Positive acceptance — hai chiều này đo sự <i>cân bằng</i> giữa dè dặt và liều lĩnh, thứ mà một metric đơn lẻ không bắt được.'}
+];
+var gp=document.getElementById('gr-pills');
+GR.forEach(function(g,i){
+  var d=document.createElement('div'); d.className='gpill'; d.dataset.i=i;
+  d.innerHTML='<b>'+g.t+'</b><span>'+g.s+'</span>';
+  d.addEventListener('click',function(){
+    Array.prototype.forEach.call(gp.children,function(x){x.classList.remove('on');});
+    d.classList.add('on');
+    document.getElementById('gr-detail').innerHTML='<b style="font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:#1F8A70;display:block;margin-bottom:5px">'+g.t+'</b>'+g.d;
+  });
+  gp.appendChild(d);
+});
+
+/* ---------- AutoNuggetizer ---------- */
+var NUG={
+ a:{ans:'Bật retry bằng cách đặt tùy chọn retry.enabled = true khi khởi tạo client. Số lần thử lại mặc định là 3, chỉnh qua retry.maxAttempts. Client dùng exponential backoff với khoảng chờ ban đầu 200ms. Chỉ các lỗi 5xx và timeout mới được retry, lỗi 4xx thì không. Có thể gắn hàm callback onRetry để ghi log mỗi lần thử lại.',
+  hits:[0,1,2,3,4],
+  note:'Phủ 5/5 nugget. Điểm nugget = 1.00 — câu trả lời đầy đủ mọi ý quan trọng.'},
+ b:{ans:'Bạn có thể bật retry cho HTTP client bằng cách đặt tùy chọn retry.enabled = true khi khởi tạo client.',
+  hits:[0],
+  note:'Chỉ phủ 1/5 nugget. Điểm nugget = 0.20. ⚠ Đáng chú ý: câu trả lời này hoàn toàn ĐÚNG và BÁM NGUỒN — Faithfulness sẽ chấm rất cao. Nhưng nó thiếu 4/5 ý người dùng cần. Đây chính là loại lỗi mà chấm theo nugget bắt được còn faithfulness bỏ lọt.'}
+};
+var NUGS=[
+ 'Bật retry: đặt retry.enabled = true khi khởi tạo',
+ 'Số lần thử lại mặc định là 3 (retry.maxAttempts)',
+ 'Dùng exponential backoff, chờ ban đầu 200ms',
+ 'Chỉ retry lỗi 5xx và timeout, không retry 4xx',
+ 'Có callback onRetry để ghi log mỗi lần thử'
+];
+function nugRender(k){
+  var d=NUG[k];
+  document.getElementById('nug-answer').textContent=d.ans;
+  var ul=document.getElementById('nug-list'); ul.innerHTML='';
+  NUGS.forEach(function(n,i){
+    var hit=d.hits.indexOf(i)>-1;
+    var li=document.createElement('li'); li.className=hit?'hit':'miss';
+    li.innerHTML='<span class="n">N'+(i+1)+'</span><span>'+n+'</span><span class="v">'+(hit?'✔ phủ':'✗ thiếu')+'</span>';
+    ul.appendChild(li);
+  });
+  document.getElementById('nug-hint').innerHTML='<span class="score-big">'+(d.hits.length/5).toFixed(2)+'</span> &nbsp;'+d.note;
+}
+Array.prototype.forEach.call(document.querySelectorAll('#nug-demo .mode'),function(b){
+  b.addEventListener('click',function(){
+    Array.prototype.forEach.call(document.querySelectorAll('#nug-demo .mode'),function(x){x.classList.remove('on');});
+    b.classList.add('on'); nugRender(b.dataset.nug);
+  });
+});
+nugRender('a');
+
+/* ---------- Explainable ---------- */
+var EXP=[
+ {t:'Mục 4.2 — Xử lý dữ liệu đã ghi khi rollback deploy',sc:0.86,
+  why:'Đoạn này nêu trực tiếp điều gì xảy ra với dữ liệu đã ghi tại thời điểm rollback — khớp cả hai vế của truy vấn: "rollback" và "dữ liệu đã ghi".'},
+ {t:'Mục 3.1 — Quy trình rollback deploy: các bước thực hiện',sc:0.71,
+  why:'Đoạn này mô tả các bước rollback nhưng KHÔNG nói gì về số phận dữ liệu. Điểm cao do trùng nhiều từ khóa ("rollback", "deploy") — <b style="color:#B0455A">đây là dấu hiệu điểm số đánh lừa</b>, lời giải thích lộ ra ngay.'},
+ {t:'Mục 6.5 — Sao lưu dữ liệu định kỳ',sc:0.64,
+  why:'Chỉ khớp vế "dữ liệu", không liên quan tới rollback. Lời giải thích cho thấy hệ thống bắt đúng một nửa truy vấn — gợi ý nên thử decompose truy vấn thành hai vế.'}
+];
+function expRender(on){
+  var box=document.getElementById('exp-docs'); box.innerHTML='';
+  EXP.forEach(function(d,i){
+    var el=document.createElement('div'); el.className='exp-doc';
+    el.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px"><span>'+d.t+'</span><span style="font-family:var(--mono);font-size:.76rem;color:var(--ink-soft)">'+d.sc.toFixed(2)+'</span></div>'+
+      '<div class="exp-why'+(on?' show':'')+'"><b>Vì sao đoạn này được chọn</b>'+d.why+'</div>';
+    box.appendChild(el);
+  });
+  document.getElementById('exp-hint').innerHTML=on
+   ?'Với lời giải thích, bạn thấy ngay: kết quả #2 điểm cao (0.71) chỉ vì <b>trùng từ khóa</b> chứ không thực sự trả lời được. Không có lời giải thích, bạn chỉ thấy "0.71" và tưởng nó liên quan.'
+   :'Chỉ nhìn điểm số: 0.86 / 0.71 / 0.64 — trông như cả ba đều khá liên quan. Bạn không có cách nào biết #2 và #3 chỉ khớp một phần truy vấn. Bật lời giải thích để thấy khác biệt.';
+}
+Array.prototype.forEach.call(document.querySelectorAll('#exp-demo .mode'),function(b){
+  b.addEventListener('click',function(){
+    Array.prototype.forEach.call(document.querySelectorAll('#exp-demo .mode'),function(x){x.classList.remove('on');});
+    b.classList.add('on'); expRender(b.dataset.exp==='on');
+  });
+});
+expRender(false);
+
+/* quizzes */
+Array.prototype.forEach.call(document.querySelectorAll('.quiz'),function(q){
+  var ans=+q.dataset.answer, opts=[].slice.call(q.querySelectorAll('.opt')), expl=q.querySelector('.expl');
+  opts.forEach(function(o,i){
+    o.addEventListener('click',function(){
+      opts.forEach(function(x,j){x.classList.remove('right','wrong'); if(j===ans)x.classList.add('right');});
+      if(i!==ans)o.classList.add('wrong');
+      expl.classList.add('show');
+    });
+  });
+});
+</script>
+</body>
+</html>

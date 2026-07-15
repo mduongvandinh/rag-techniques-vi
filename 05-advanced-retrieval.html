@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Truy xuất nâng cao: Hierarchical, Dartboard, Filtering, Multi-modal — Sổ tay RAG</title>
+<style>
+:root{
+  --bg:#F7F8FC; --surface:#FFFFFF; --ink:#16213A; --ink-soft:#4A5570;
+  --line:#DDE2EF; --primary:#3B4CC0; --primary-soft:#E8EBFA;
+  --amber:#B97C1D; --amber-soft:#FBF3E2; --teal:#1F8A70; --teal-soft:#E3F4EF;
+  --rose:#B0455A; --rose-soft:#F9E9ED;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+  --sans:"Be Vietnam Pro","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.7;font-size:16.5px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px}
+a{color:var(--primary)}
+#progress{position:fixed;top:0;left:0;height:3px;background:var(--primary);width:0;z-index:99}
+header{background:var(--ink);color:#EDF0FA;padding:44px 0 34px}
+.crumb{font-family:var(--mono);font-size:.78rem;color:#9FB0E8}
+.crumb a{color:#9FB0E8;text-decoration:none}
+.crumb a:hover{text-decoration:underline}
+header h1{font-size:clamp(1.7rem,4vw,2.4rem);font-weight:800;margin:.5rem 0;letter-spacing:-.02em;line-height:1.2}
+header p{color:#C3CCE8;max-width:660px}
+.rail-panel{background:#101830;padding:14px 0 20px}
+.rail-panel svg{display:block;margin:0 auto}
+nav.toc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:26px auto;max-width:860px}
+nav.toc b{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+nav.toc ol{margin:8px 0 0 20px}
+nav.toc li{padding:2px 0}
+section.tech{padding:36px 0 10px}
+.tech-head{border-left:5px solid var(--primary);padding-left:16px;margin-bottom:20px}
+.tech-head .kicker{font-family:var(--mono);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--primary)}
+.tech-head h2{font-size:1.7rem;font-weight:800}
+.badges{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.badge{font-family:var(--mono);font-size:.68rem;padding:2px 9px;border-radius:99px}
+.lv2{background:var(--amber-soft);color:var(--amber)} .lv3{background:var(--rose-soft);color:var(--rose)}
+.stage{background:var(--primary-soft);color:var(--primary)}
+.stage-idx{background:var(--teal-soft);color:var(--teal)}
+h3{font-size:1.12rem;font-weight:700;margin:28px 0 8px}
+p{margin-bottom:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0;overflow-x:auto}
+.problem{border-left:4px solid var(--rose);background:var(--rose-soft)}
+.insight{border-left:4px solid var(--teal);background:var(--teal-soft)}
+.problem b,.insight b{display:block;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.problem b{color:var(--rose)} .insight b{color:var(--teal)}
+pre{background:#101830;color:#D9E0F5;font-family:var(--mono);font-size:.82rem;line-height:1.6;padding:16px 18px;border-radius:12px;overflow-x:auto;margin:14px 0}
+pre .c{color:#7A88B8} pre .k{color:#FFC96B} pre .s{color:#8FD3B6}
+code{font-family:var(--mono);font-size:.85em;background:var(--primary-soft);color:var(--primary);padding:1px 6px;border-radius:5px}
+pre code{background:none;color:inherit;padding:0}
+.demo{background:var(--surface);border:2px solid var(--primary);border-radius:14px;padding:20px;margin:18px 0}
+.demo .demo-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.demo .demo-tag::before{content:"▶";font-size:.6rem}
+.controls{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;align-items:center}
+button{font-family:var(--sans);font-size:.9rem;padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+button.primary{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+button.primary:hover{background:#2E3CA0}
+button.mode{border:1.5px solid var(--line)}
+button.mode.on{border-color:var(--primary);background:var(--primary-soft);color:var(--primary);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #9FB0E8;outline-offset:1px}
+select{font-family:var(--sans);font-size:.88rem;padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:#fff}
+input[type=range]{accent-color:var(--primary);width:180px}
+.slider-val{font-family:var(--mono);font-size:.82rem;background:var(--primary-soft);color:var(--primary);padding:2px 8px;border-radius:6px}
+.hint{font-size:.84rem;color:var(--ink-soft);margin-top:8px}
+
+/* hierarchical demo */
+.hier-tier{margin-top:12px}
+.tier-label{font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px}
+.doc-summary{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;border:1.5px solid var(--line);border-radius:9px;padding:9px 12px;margin-bottom:7px;background:var(--bg);font-size:.87rem;transition:all .3s}
+.doc-summary.picked{border-color:var(--primary);background:var(--primary-soft)}
+.doc-summary .sc{font-family:var(--mono);font-size:.74rem;color:var(--ink-soft)}
+.detail-chunks{list-style:none;margin:6px 0 12px 22px;padding-left:12px;border-left:2px dashed var(--primary)}
+.detail-chunks li{font-size:.82rem;padding:6px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:5px;background:#fff}
+.detail-chunks li.best{border-color:var(--teal);background:var(--teal-soft);font-weight:600}
+.ghost-note{font-size:.82rem;color:var(--rose);background:var(--rose-soft);border-radius:8px;padding:8px 11px;margin-top:8px}
+
+/* dartboard demo */
+.cand-list{list-style:none;margin-top:10px}
+.cand-list li{display:grid;grid-template-columns:26px 1fr 120px 70px;gap:10px;align-items:center;border:1.5px solid var(--line);border-radius:9px;padding:9px 12px;margin-bottom:7px;background:var(--bg);font-size:.86rem;transition:all .3s}
+.cand-list li.sel{border-color:var(--teal);background:var(--teal-soft)}
+.cand-list .fact{font-family:var(--mono);font-size:.7rem;padding:2px 7px;border-radius:99px;background:var(--line);color:var(--ink-soft)}
+.cand-list li[data-f="A"] .fact{background:#E8EBFA;color:#3B4CC0}
+.cand-list li[data-f="B"] .fact{background:#FBF3E2;color:#B97C1D}
+.cand-list li[data-f="C"] .fact{background:#E3F4EF;color:#1F8A70}
+.cand-list li[data-f="D"] .fact{background:#F9E9ED;color:#B0455A}
+.cand-list .rel{font-family:var(--mono);font-size:.76rem;text-align:right;color:var(--ink-soft)}
+.cand-list .pick{font-family:var(--mono);font-size:.7rem;text-align:center}
+.coverage{margin-top:10px;font-size:.88rem;padding:10px 13px;border-radius:9px;border:1.5px solid}
+.coverage.bad{background:var(--rose-soft);border-color:var(--rose)}
+.coverage.good{background:var(--teal-soft);border-color:var(--teal)}
+
+/* filtering demo */
+.filt-list{list-style:none;margin-top:12px}
+.filt-list li{display:grid;grid-template-columns:1fr 100px 70px;gap:10px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin-bottom:6px;background:var(--bg);font-size:.85rem;transition:all .3s}
+.filt-list li.out{opacity:.3;border-style:dashed}
+.filt-list .meta{font-family:var(--mono);font-size:.72rem;color:var(--ink-soft)}
+.filt-list .sim{font-family:var(--mono);font-size:.74rem;text-align:right}
+.filt-count{font-family:var(--mono);font-size:.82rem;background:var(--primary-soft);color:var(--primary);padding:3px 10px;border-radius:99px;display:inline-block;margin-top:8px}
+
+/* multimodal */
+.mm-toggle-body{margin-top:12px}
+.mm-flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.82rem}
+.mm-step{background:var(--bg);border:1.5px solid var(--line);border-radius:9px;padding:9px 12px;text-align:center;flex:1;min-width:110px}
+.mm-step.hi{border-color:var(--primary);background:var(--primary-soft)}
+.mm-arrow{color:var(--ink-soft);font-weight:700}
+
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.duo .col{border-radius:12px;padding:16px 18px}
+.duo .yes{background:var(--teal-soft);border:1px solid #BADFD2}
+.duo .no{background:var(--rose-soft);border:1px solid #EBC6CE}
+.duo h4{font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.duo .yes h4{color:var(--teal)} .duo .no h4{color:var(--rose)}
+.duo ul{margin-left:18px;font-size:.9rem}
+.duo li{margin-bottom:6px}
+@media (max-width:620px){.duo{grid-template-columns:1fr}.cand-list li{grid-template-columns:22px 1fr 84px 54px}}
+.quiz{background:var(--amber-soft);border:1px solid #EAD9B4;border-radius:14px;padding:20px;margin:20px 0}
+.quiz .q-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:8px}
+.quiz p.q{font-weight:600;margin-bottom:10px}
+.quiz .opts{display:flex;flex-direction:column;gap:8px}
+.quiz .opt{text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:9px 13px;font-size:.92rem;cursor:pointer}
+.quiz .opt:hover{border-color:var(--amber)}
+.quiz .opt.right{border-color:var(--teal);background:var(--teal-soft)}
+.quiz .opt.wrong{border-color:var(--rose);background:var(--rose-soft)}
+.quiz .expl{display:none;margin-top:10px;font-size:.88rem;background:#fff;border-radius:9px;padding:10px 13px}
+.quiz .expl.show{display:block}
+table{width:100%;border-collapse:collapse;background:var(--surface);font-size:.88rem}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--ink);color:#EDF0FA;font-size:.76rem;text-transform:uppercase;letter-spacing:.05em}
+.table-scroll{overflow-x:auto;border-radius:12px;border:1px solid var(--line);margin:14px 0}
+.summary{background:var(--ink);color:#D9E0F5;border-radius:14px;padding:24px;margin:30px 0}
+.summary h3{color:#FFC96B;margin-top:0}
+.summary ul{margin-left:20px}
+.summary li{margin-bottom:8px}
+.nav-next{display:flex;justify-content:space-between;gap:12px;padding:10px 0 50px;flex-wrap:wrap}
+.nav-next a{text-decoration:none;font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 18px}
+.nav-next a:hover{border-color:var(--primary)}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<header>
+  <div class="wrap">
+    <div class="crumb"><a href="index.html">← Trang tổng quan</a> · Nhóm Truy xuất nâng cao · Batch 4</div>
+    <h1>Truy xuất nâng cao — tìm thông minh hơn, không chỉ nhiều hơn</h1>
+    <p>Sau khi có Fusion và Reranking (Batch 1), bốn kỹ thuật này giải các bài toán tinh vi hơn: truy xuất trên kho <b>khổng lồ</b> mà không quét hết (Hierarchical), tránh trả về <b>tài liệu trùng lặp</b> (Dartboard), lọc theo <b>thuộc tính</b> ngoài ngữ nghĩa (Filtering), và truy xuất trên <b>ảnh, bảng, biểu đồ</b> (Multi-modal).</p>
+  </div>
+</header>
+
+<div class="rail-panel">
+  <svg viewBox="0 0 760 56" width="100%" style="max-width:820px" role="img" aria-label="Nhóm truy xuất nâng cao tập trung ở giai đoạn truy xuất">
+    <line x1="20" y1="28" x2="740" y2="28" stroke="#2A3560" stroke-width="2"/>
+    <g font-size="11" text-anchor="middle">
+      <circle cx="80" cy="28" r="7" fill="#2A3560"/><text x="80" y="52" fill="#6C7BB0">Lập chỉ mục</text>
+      <circle cx="240" cy="28" r="7" fill="#2A3560"/><text x="240" y="52" fill="#6C7BB0">Truy vấn</text>
+      <circle cx="400" cy="28" r="11" fill="#FFC96B"/><text x="400" y="52" fill="#FFC96B" font-weight="700">Truy xuất ◀ bạn ở đây</text>
+      <circle cx="560" cy="28" r="7" fill="#2A3560"/><text x="560" y="52" fill="#6C7BB0">Hậu xử lý</text>
+      <circle cx="700" cy="28" r="7" fill="#2A3560"/><text x="700" y="52" fill="#6C7BB0">Sinh</text>
+    </g>
+  </svg>
+</div>
+
+<nav class="toc wrap">
+  <b>Trong bài này</b>
+  <ol>
+    <li><a href="#hier">Hierarchical Indices</a> — hai tầng: tóm tắt → chi tiết</li>
+    <li><a href="#dart">Dartboard Retrieval</a> — liên quan + đa dạng trong một hàm điểm</li>
+    <li><a href="#filter">Multi-faceted Filtering</a> — lọc theo metadata, ngưỡng, đa dạng</li>
+    <li><a href="#multimodal">Multi-modal RAG</a> — captioning vs ColPali</li>
+    <li><a href="#compare">Tổng kết & bước tiếp</a></li>
+  </ol>
+</nav>
+
+<!-- ================= HIERARCHICAL ================= -->
+<section class="tech" id="hier">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 1/4</div>
+      <h2>Hierarchical Indices</h2>
+      <div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge stage">Index + Truy xuất</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Trên kho lớn (hàng trăm nghìn chunk), tìm phẳng gặp hai vấn đề: (1) so khớp với <i>mọi</i> chunk tốn kém, và (2) một chunk từ tài liệu hoàn toàn lạc đề nhưng tình cờ chứa từ trùng có thể lọt vào top-k, đẩy chunk đúng ra ngoài.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi — hai tầng</b>
+      Tầng trên: mỗi tài liệu có một <b>bản tóm tắt</b> được embed. Tầng dưới: các chunk chi tiết. Truy vấn <b>tìm ở tầng tóm tắt trước</b> để chọn ra vài tài liệu đúng, rồi <b>chỉ đào sâu chunk trong những tài liệu đó</b>. Vừa nhanh, vừa tránh nhiễu từ tài liệu lạc đề.
+    </div>
+
+    <div class="demo" id="hier-demo">
+      <div class="demo-tag">Demo mô phỏng — tìm phân cấp hai bước</div>
+      <p style="font-size:.9rem">Truy vấn: <span class="slider-val">"quy trình rollback khi deploy lỗi?"</span>. Kho có 4 tài liệu (mỗi cái nhiều chunk). Nhấn để tìm ở tầng tóm tắt trước.</p>
+      <div class="controls">
+        <button class="primary" id="hier-btn">Bước 1: Tìm ở tầng tóm tắt ▸</button>
+        <button id="hier-reset">↺ Làm lại</button>
+      </div>
+      <div class="hier-tier">
+        <div class="tier-label">Tầng 1 — Tóm tắt tài liệu</div>
+        <div id="hier-summaries"></div>
+      </div>
+      <div id="hier-detail"></div>
+      <div class="hint" id="hier-hint">Nhấn nút để bắt đầu. Chú ý: tìm phẳng sẽ so khớp với TẤT CẢ chunk của cả 4 tài liệu cùng lúc.</div>
+    </div>
+
+    <div class="quiz" data-answer="1">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Lợi ích "chống nhiễu" của Hierarchical Indices đến từ đâu?</p>
+      <div class="opts">
+        <button class="opt">Từ việc embedding tóm tắt chính xác hơn embedding chunk</button>
+        <button class="opt">Từ việc lọc bỏ cả tài liệu lạc đề ở tầng trên → chunk gây nhiễu của chúng không bao giờ được đem ra so khớp</button>
+        <button class="opt">Từ việc dùng ít token hơn</button>
+      </div>
+      <div class="expl">Chốt chặn nằm ở tầng tóm tắt: nếu một tài liệu bị loại vì tóm tắt của nó không khớp, thì mọi chunk của nó — kể cả chunk tình cờ trùng từ khóa — không bao giờ vào vòng so khớp chi tiết. Tìm phẳng không có bộ lọc này nên dễ bị chunk "lạc đề mà trùng chữ" gây nhiễu.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= DARTBOARD ================= -->
+<section class="tech" id="dart">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 2/4</div>
+      <h2>Dartboard Retrieval</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage">Giai đoạn: Truy xuất</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Top-k thuần theo độ liên quan có một điểm yếu chết người trên kho <b>dày đặc</b>: 3 tài liệu điểm cao nhất có thể là 3 bản gần trùng nhau, cùng nói một sự thật. Bạn "lãng phí" cả 3 khe ngữ cảnh cho một thông tin, trong khi các sự thật khác mà câu hỏi cần thì không lọt vào.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Đừng chỉ tối ưu <i>độ liên quan</i>, hãy tối ưu <b>độ liên quan + độ đa dạng</b> trong cùng một hàm điểm. Sau khi chọn một tài liệu, "hạ điểm" những tài liệu quá giống nó — để khe tiếp theo ưu tiên thông tin <i>mới</i>. Kết quả: một bộ tài liệu phủ được nhiều mặt của câu hỏi.
+    </div>
+
+    <div class="demo" id="dart-demo">
+      <div class="demo-tag">Demo mô phỏng — top-k thuần vs Dartboard</div>
+      <p style="font-size:.9rem">Câu hỏi cần 3 sự thật A, B, C. Sáu ứng viên bên dưới, cột phải là độ liên quan. Để ý: 3 ứng viên điểm cao nhất đều là sự thật <b>A</b> (gần trùng nhau).</p>
+      <div class="controls" role="group">
+        <button class="mode on" data-d="rel">Top-3 thuần độ liên quan</button>
+        <button class="mode" data-d="dart">Dartboard (liên quan + đa dạng)</button>
+      </div>
+      <ul class="cand-list" id="dart-list"></ul>
+      <div class="coverage bad" id="dart-cov"></div>
+    </div>
+
+<pre><code><span class="c"># Chọn tham lam: mỗi bước tối đa (liên quan − trùng lặp với đã chọn)</span>
+selected = []
+<span class="k">while</span> len(selected) &lt; k:
+    best = argmax(candidates,
+        key=<span class="k">lambda</span> d: rel(d, query) - lambda_ * max_sim(d, selected))
+    selected.append(best); candidates.remove(best)
+<span class="c"># lambda_ lớn = ưu tiên đa dạng; nhỏ = ưu tiên liên quan thuần</span></code></pre>
+
+    <div class="quiz" data-answer="2">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Repo gốc nhấn mạnh Dartboard đặc biệt vượt trội trong hoàn cảnh nào?</p>
+      <div class="opts">
+        <button class="opt">Khi kho rất nhỏ, chỉ vài tài liệu</button>
+        <button class="opt">Khi câu hỏi chỉ cần đúng một sự thật</button>
+        <button class="opt">Khi kho dày đặc, nhiều tài liệu gần trùng nhau — lúc đó top-k thuần lãng phí khe ngữ cảnh cho thông tin lặp lại</button>
+      </div>
+      <div class="expl">Trên kho thưa, tài liệu ít trùng nên top-k thuần đã đa dạng sẵn — Dartboard không thêm nhiều. Giá trị của nó bùng lên khi kho <b>dày đặc</b>: nhiều bản sao/gần-trùng của cùng thông tin. Khi đó tối ưu đa dạng mới cứu được các khe ngữ cảnh quý giá.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FILTERING ================= -->
+<section class="tech" id="filter">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 3/4</div>
+      <h2>Multi-faceted Filtering</h2>
+      <div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge stage">Giai đoạn: Truy xuất</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Độ tương đồng ngữ nghĩa không phải tiêu chí duy nhất. Người dùng thường cần thêm ràng buộc <i>ngoài nội dung</i>: chỉ tài liệu của phiên bản còn hỗ trợ, chỉ từ nguồn chính thức, chỉ trong khoảng thời gian nào đó. Vector search một mình không lọc được những điều này.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi — bốn lớp lọc</b>
+      Kết hợp nhiều bộ lọc chồng lên kết quả truy xuất: <b>metadata</b> (ngày, nguồn, loại), <b>ngưỡng tương đồng</b> (bỏ kết quả điểm thấp), <b>nội dung</b> (phải chứa/không chứa từ khóa), <b>đa dạng</b> (loại bản gần trùng). Mỗi lớp cắt bớt nhiễu theo một chiều khác nhau.
+    </div>
+
+    <div class="demo" id="filt-demo">
+      <div class="demo-tag">Demo mô phỏng — bật các lớp lọc</div>
+      <p style="font-size:.9rem">8 kết quả thô cho truy vấn về "cấu hình connection pool". Điều chỉnh các bộ lọc và xem danh sách thu hẹp.</p>
+      <div class="controls">
+        <label style="font-size:.86rem">Loại:
+          <select id="filt-type">
+            <option value="all">Tất cả</option>
+            <option value="law">Chỉ tài liệu chính thức</option>
+            <option value="news">Chỉ blog / cộng đồng</option>
+          </select>
+        </label>
+        <label style="font-size:.86rem;display:flex;align-items:center;gap:6px">Ngưỡng ≥
+          <input type="range" id="filt-th" min="0.4" max="0.9" step="0.05" value="0.5">
+          <span class="slider-val" id="filt-th-val">0.50</span>
+        </label>
+        <label style="font-size:.86rem;display:flex;align-items:center;gap:6px"><input type="checkbox" id="filt-valid" style="accent-color:var(--primary)"> Chỉ phiên bản còn hỗ trợ</label>
+      </div>
+      <ul class="filt-list" id="filt-list"></ul>
+      <span class="filt-count" id="filt-count"></span>
+    </div>
+
+    <div class="quiz" data-answer="0">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Vì sao lọc metadata "chỉ phiên bản còn hỗ trợ" lại quan trọng sống còn với RAG trên tài liệu kỹ thuật?</p>
+      <div class="opts">
+        <button class="opt">Vì tài liệu của phiên bản đã ngừng hỗ trợ vẫn "rất liên quan" về ngữ nghĩa — vector search sẽ hồn nhiên trả về, khiến người dùng làm theo hướng dẫn đã lỗi thời</button>
+        <button class="opt">Vì tài liệu cũ có embedding kém chính xác</button>
+        <button class="opt">Vì để tiết kiệm dung lượng lưu trữ</button>
+      </div>
+      <div class="expl">Đây là cạm bẫy kinh điển: docs v1 và v3 cực kỳ giống nhau về ngữ nghĩa (cùng chủ đề, cùng thuật ngữ) nên vector search xếp cả hai lên đầu — thậm chí bản cũ có thể điểm cao hơn. Chỉ có metadata "phiên bản / trạng thái hỗ trợ" mới phân biệt được. Không lọc = rủi ro hướng dẫn theo API đã bị gỡ bỏ.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MULTIMODAL ================= -->
+<section class="tech" id="multimodal">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 4/4</div>
+      <h2>Multi-modal RAG</h2>
+      <div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge stage-idx">Index + Truy xuất</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Nhiều tài liệu thật chứa thông tin trong <b>ảnh, bảng, biểu đồ, sơ đồ</b> — thứ mà pipeline chỉ-text bỏ qua hoàn toàn. Một bảng số liệu quan trọng trong PDF có thể vô hình với RAG thông thường.
+    </div>
+
+    <div class="panel insight">
+      <b>Hai hướng tiếp cận</b>
+      Repo gốc minh họa hai cách đưa nội dung hình ảnh vào RAG. <b>Captioning</b>: dùng mô hình thị giác mô tả ảnh thành <i>text</i>, rồi embed text đó như bình thường. <b>ColPali</b>: bỏ qua bước text — embed thẳng <i>ảnh trang tài liệu</i>, và so khớp truy vấn với ảnh bằng mô hình đa phương thức.
+    </div>
+
+    <div class="demo" id="mm-demo">
+      <div class="demo-tag">Demo mô phỏng — so sánh hai đường đi</div>
+      <div class="controls" role="group">
+        <button class="mode on" data-mm="cap">Đường Captioning</button>
+        <button class="mode" data-mm="col">Đường ColPali</button>
+      </div>
+      <div class="mm-toggle-body">
+        <div class="mm-flow" id="mm-flow"></div>
+      </div>
+      <div class="hint" id="mm-hint"></div>
+    </div>
+
+    <div class="duo">
+      <div class="col yes"><h4>Captioning hợp khi</h4><ul>
+        <li>Hạ tầng chỉ có vector store text — tái dùng được toàn bộ pipeline hiện có.</li>
+        <li>Nội dung ảnh mô tả được bằng lời (biểu đồ đơn giản, ảnh minh họa).</li>
+        <li>Muốn kết hợp text và ảnh trong cùng một chỉ mục.</li>
+      </ul></div>
+      <div class="col no"><h4>ColPali hợp khi</h4><ul>
+        <li>Bố cục trực quan quan trọng (bảng phức tạp, biểu mẫu, layout).</li>
+        <li>Captioning làm mất chi tiết — mô tả text không giữ nổi cấu trúc bảng.</li>
+        <li>Chấp nhận hạ tầng đa phương thức phức tạp hơn để đổi lấy độ trung thực.</li>
+      </ul></div>
+    </div>
+
+    <div class="quiz" data-answer="1">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Điểm yếu cố hữu của hướng Captioning là gì?</p>
+      <div class="opts">
+        <button class="opt">Chạy chậm hơn ColPali</button>
+        <button class="opt">Bước "ảnh → text" là điểm thắt cổ chai mất mát: mọi thứ mô hình mô tả không nhắc tới sẽ vĩnh viễn biến mất khỏi chỉ mục</button>
+        <button class="opt">Không thể dùng với vector store text</button>
+      </div>
+      <div class="expl">Captioning nén một ảnh giàu thông tin thành vài câu mô tả — bất cứ chi tiết nào caption bỏ sót (một ô trong bảng, một nhãn nhỏ trên biểu đồ) sẽ không bao giờ truy xuất được, vì chỉ mục chỉ giữ text. ColPali giữ nguyên ảnh nên tránh được nút thắt này, đổi lại hạ tầng phức tạp hơn.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPARE ================= -->
+<section class="tech" id="compare">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Tổng kết nhóm</div>
+      <h2>So sánh & khi nào cần đến chúng</h2>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Kỹ thuật</th><th>Độ phức tạp</th><th>Giải bài toán</th><th>Kích hoạt khi</th></tr></thead>
+      <tbody>
+        <tr><td><b>Hierarchical Indices</b></td><td>★★☆</td><td>Kho lớn + nhiễu từ tài liệu lạc đề</td><td>Nhiều tài liệu dài, mỗi cái nhiều chunk</td></tr>
+        <tr><td><b>Dartboard</b></td><td>★★★</td><td>Tài liệu trùng lặp lãng phí khe ngữ cảnh</td><td>Kho dày đặc, nhiều bản gần trùng</td></tr>
+        <tr><td><b>Multi-faceted Filtering</b></td><td>★★☆</td><td>Ràng buộc ngoài ngữ nghĩa (ngày, nguồn, phiên bản)</td><td>Có metadata quan trọng; kho tài liệu nhiều phiên bản</td></tr>
+        <tr><td><b>Multi-modal RAG</b></td><td>★★★</td><td>Thông tin nằm trong ảnh/bảng/biểu đồ</td><td>Tài liệu có nội dung trực quan đáng kể</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="summary">
+      <h3>Ghi nhớ 4 điều</h3>
+      <ul>
+        <li>Hierarchical dùng tầng tóm tắt làm <b>bộ lọc cấp tài liệu</b> — vừa nhanh hơn, vừa chặn nhiễu từ tài liệu lạc đề trước khi so khớp chunk.</li>
+        <li>Dartboard nhắc ta: top-k thuần độ liên quan có thể trả về thông tin <b>lặp lại</b>; tối ưu thêm đa dạng để phủ nhiều mặt câu hỏi.</li>
+        <li>Filtering bổ sung các chiều <b>ngoài ngữ nghĩa</b> — lọc phiên bản là sống còn cho kho tài liệu có nhiều bản.</li>
+        <li>Multi-modal: Captioning tái dùng hạ tầng text nhưng có nút thắt mất mát; ColPali trung thực hơn nhưng phức tạp hơn.</li>
+      </ul>
+    </div>
+
+    <div class="nav-next">
+      <a href="02-retrieval.html">← Xem lại: Fusion & Reranking</a>
+      <a href="index.html">Trang tổng quan →</a>
+    </div>
+    <p style="font-size:.85rem;color:var(--ink-soft)">Batch 4 hoàn tất nhóm Truy xuất nâng cao (19/35 kỹ thuật). Batch tiếp theo: nhóm Vòng lặp & thích ứng (Retrieval with Feedback Loop, Adaptive Retrieval).</p>
+  </div>
+</section>
+
+<script>
+/* progress */
+addEventListener('scroll',()=>{
+  const h=document.documentElement;
+  document.getElementById('progress').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';
+},{passive:true});
+
+/* ---------- Hierarchical ---------- */
+const HDOCS=[
+ {t:'Sổ tay vận hành — quy trình deploy, rollback, xử lý sự cố',sc:0.89,pick:true,
+   chunks:[{t:'Chunk 3.1 — Điều kiện rollback trong 24h đầu',best:false},{t:'Chunk 3.2 — Quy trình rollback sau deploy lỗi: các bước & thời hạn',best:true},{t:'Chunk 3.3 — Trường hợp không thể rollback',best:false}]},
+ {t:'Hướng dẫn CI/CD — cấu hình pipeline, môi trường build',sc:0.44,pick:false,chunks:[]},
+ {t:'Tài liệu Database — migration, rollback schema (nhắc "rollback" nhưng ngữ cảnh khác)',sc:0.58,pick:true,
+   chunks:[{t:'Chunk 6.2 — Rollback migration cơ sở dữ liệu: xử lý kỹ thuật',best:false},{t:'Chunk 6.3 — Đối soát dữ liệu sau migration',best:false}]},
+ {t:'Hướng dẫn sử dụng dashboard — đăng nhập, xem biểu đồ',sc:0.31,pick:false,chunks:[]}
+];
+let hierStep=0;
+function hierRender(){
+  const sum=document.getElementById('hier-summaries'); sum.innerHTML='';
+  HDOCS.forEach(d=>{
+    const el=document.createElement('div');
+    el.className='doc-summary'+(hierStep>=1&&d.pick?' picked':'');
+    el.innerHTML='<span>'+(hierStep>=1&&d.pick?'✔ ':'')+d.t+'</span><span class="sc">'+d.sc.toFixed(2)+'</span>';
+    sum.appendChild(el);
+  });
+  const det=document.getElementById('hier-detail'); det.innerHTML='';
+  if(hierStep>=2){
+    det.innerHTML='<div class="tier-label" style="margin-top:14px">Tầng 2 — Chỉ đào chunk trong 2 tài liệu đã chọn</div>';
+    HDOCS.filter(d=>d.pick).forEach(d=>{
+      const ul=document.createElement('ul'); ul.className='detail-chunks';
+      d.chunks.forEach(c=>{const li=document.createElement('li');if(c.best)li.className='best';li.textContent=(c.best?'★ ':'')+c.t;ul.appendChild(li);});
+      det.appendChild(ul);
+    });
+    const g=document.createElement('div'); g.className='ghost-note';
+    g.innerHTML='⚠ Nếu tìm phẳng: chunk "Rollback migration cơ sở dữ liệu" (tài liệu Database) và các chunk chứa chữ "rollback" từ tài liệu lạc đề cũng đua tranh top-k, dễ đẩy Chunk 3.2 đúng ra ngoài. Tầng tóm tắt đã loại bớt rủi ro đó.';
+    det.appendChild(g);
+  }
+  const b=document.getElementById('hier-btn');
+  if(hierStep===0)b.textContent='Bước 1: Tìm ở tầng tóm tắt ▸';
+  else if(hierStep===1){b.textContent='Bước 2: Đào chunk trong tài liệu đã chọn ▸';
+    document.getElementById('hier-hint').textContent='Tầng 1 chọn 2 tài liệu có tóm tắt khớp nhất (0.89 và 0.58). Hai tài liệu điểm thấp bị loại — chunk của chúng sẽ không được đem so khớp.';}
+  else{b.disabled=true;document.getElementById('hier-hint').textContent='Hoàn tất: chỉ so khớp chunk trong 2 tài liệu đã lọc → tìm ra Chunk 3.2 đúng, tránh nhiễu từ tài liệu lạc đề.';}
+}
+document.getElementById('hier-btn').addEventListener('click',()=>{hierStep=Math.min(hierStep+1,2);hierRender();});
+document.getElementById('hier-reset').addEventListener('click',()=>{hierStep=0;document.getElementById('hier-btn').disabled=false;document.getElementById('hier-hint').textContent='Nhấn nút để bắt đầu. Chú ý: tìm phẳng sẽ so khớp với TẤT CẢ chunk của cả 4 tài liệu cùng lúc.';hierRender();});
+hierRender();
+
+/* ---------- Dartboard ---------- */
+const DCAND=[
+ {id:1,t:'Sự thật A — cách 1 diễn đạt',f:'A',rel:0.92},
+ {id:2,t:'Sự thật A — cách 2 diễn đạt (gần trùng)',f:'A',rel:0.90},
+ {id:3,t:'Sự thật A — cách 3 diễn đạt (gần trùng)',f:'A',rel:0.88},
+ {id:4,t:'Sự thật B',f:'B',rel:0.80},
+ {id:5,t:'Sự thật C',f:'C',rel:0.75},
+ {id:6,t:'Sự thật D (ngoài lề)',f:'D',rel:0.60}
+];
+function dartRender(mode){
+  let sel;
+  if(mode==='rel') sel=[1,2,3];
+  else sel=[1,4,5]; // dartboard: A, B, C
+  const ul=document.getElementById('dart-list'); ul.innerHTML='';
+  DCAND.forEach(d=>{
+    const li=document.createElement('li'); li.dataset.f=d.f;
+    if(sel.includes(d.id))li.className='sel';
+    li.innerHTML='<span class="pos" style="font-family:var(--mono);color:var(--ink-soft)">'+d.id+'</span>'
+      +'<span>'+d.t+'</span>'
+      +'<span class="fact">Sự thật '+d.f+'</span>'
+      +'<span class="rel">'+(sel.includes(d.id)?'✔ chọn':d.rel.toFixed(2))+'</span>';
+    ul.appendChild(li);
+  });
+  const cov=document.getElementById('dart-cov');
+  const facts=new Set(sel.map(id=>DCAND.find(d=>d.id===id).f));
+  if(mode==='rel'){
+    cov.className='coverage bad';
+    cov.innerHTML='<b>Phủ '+facts.size+'/3 sự thật.</b> Top-3 thuần chọn cả 3 bản của sự thật A (điểm cao nhất) — lãng phí 3 khe ngữ cảnh cho MỘT thông tin. B và C không lọt vào, câu trả lời sẽ thiếu.';
+  }else{
+    cov.className='coverage good';
+    cov.innerHTML='<b>Phủ '+facts.size+'/3 sự thật. ✔</b> Dartboard chọn A (điểm cao nhất) rồi hạ điểm các bản trùng A, nên khe 2–3 dành cho B và C. Bộ kết quả phủ trọn câu hỏi.';
+  }
+}
+document.querySelectorAll('#dart-demo .mode').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#dart-demo .mode').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); dartRender(b.dataset.d);
+}));
+dartRender('rel');
+
+/* ---------- Filtering ---------- */
+const FDOCS=[
+ {t:'Docs v3 — Cấu hình connection pool (phiên bản hiện tại)',type:'law',valid:true,sim:0.88},
+ {t:'Docs v1 — Cấu hình connection pool (đã ngừng hỗ trợ)',type:'law',valid:false,sim:0.86},
+ {t:'Blog: sắp có thay đổi lớn về connection pool ở v4',type:'news',valid:true,sim:0.72},
+ {t:'Docs v3 — Hướng dẫn tinh chỉnh pool size cho production',type:'law',valid:true,sim:0.69},
+ {t:'Bài blog: connection pool là gì, có cần dùng không',type:'news',valid:true,sim:0.55},
+ {t:'Thông báo lịch bảo trì hệ thống (lạc đề)',type:'news',valid:true,sim:0.41},
+ {t:'Docs v3 — Cấu hình thread pool (chủ đề gần)',type:'law',valid:true,sim:0.48},
+ {t:'Quảng cáo dịch vụ tư vấn tối ưu hạ tầng',type:'news',valid:true,sim:0.44}
+];
+function filtRender(){
+  const type=document.getElementById('filt-type').value;
+  const th=+document.getElementById('filt-th').value;
+  const validOnly=document.getElementById('filt-valid').checked;
+  document.getElementById('filt-th-val').textContent=th.toFixed(2);
+  const ul=document.getElementById('filt-list'); ul.innerHTML='';
+  let kept=0;
+  FDOCS.forEach(d=>{
+    const pass=(type==='all'||d.type===type)&&d.sim>=th&&(!validOnly||d.valid);
+    if(pass)kept++;
+    const li=document.createElement('li'); if(!pass)li.className='out';
+    li.innerHTML='<span>'+d.t+'</span><span class="meta">'+(d.type==='law'?'chính thức':'blog')+(d.valid?'':' · ngừng hỗ trợ')+'</span><span class="sim">'+d.sim.toFixed(2)+'</span>';
+    ul.appendChild(li);
+  });
+  document.getElementById('filt-count').textContent='Còn lại: '+kept+'/8 kết quả sau lọc';
+}
+['filt-type','filt-th','filt-valid'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',filtRender);
+  document.getElementById(id).addEventListener('change',filtRender);
+});
+filtRender();
+
+/* ---------- Multimodal ---------- */
+const MM={
+ cap:{steps:['Ảnh/bảng trong PDF','Mô hình thị giác → mô tả TEXT','Embed text','Vector store TEXT','Truy vấn khớp text'],hi:[1],
+   note:'Captioning: ảnh bị "phiên dịch" thành text trước. Ưu điểm — tái dùng hạ tầng text sẵn có. Nhược — bất cứ chi tiết nào caption bỏ sót sẽ mất khỏi chỉ mục vĩnh viễn.'},
+ col:{steps:['Ảnh trang tài liệu','Embed THẲNG ảnh (đa phương thức)','Vector store đa phương thức','Truy vấn khớp trực tiếp ảnh'],hi:[1],
+   note:'ColPali: không qua bước text, embed nguyên ảnh trang. Ưu điểm — giữ trọn bố cục, bảng, nhãn nhỏ. Nhược — cần hạ tầng đa phương thức phức tạp và nặng hơn.'}
+};
+function mmRender(k){
+  const d=MM[k]; const flow=document.getElementById('mm-flow'); flow.innerHTML='';
+  d.steps.forEach((s,i)=>{
+    const step=document.createElement('div'); step.className='mm-step'+(d.hi.includes(i)?' hi':''); step.textContent=s;
+    flow.appendChild(step);
+    if(i<d.steps.length-1){const a=document.createElement('span');a.className='mm-arrow';a.textContent='→';flow.appendChild(a);}
+  });
+  document.getElementById('mm-hint').textContent=d.note;
+}
+document.querySelectorAll('#mm-demo .mode').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#mm-demo .mode').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); mmRender(b.dataset.mm);
+}));
+mmRender('cap');
+
+/* quizzes */
+document.querySelectorAll('.quiz').forEach(q=>{
+  const ans=+q.dataset.answer, opts=[...q.querySelectorAll('.opt')], expl=q.querySelector('.expl');
+  opts.forEach((o,i)=>o.addEventListener('click',()=>{
+    opts.forEach((x,j)=>{x.classList.remove('right','wrong'); if(j===ans)x.classList.add('right');});
+    if(i!==ans)o.classList.add('wrong');
+    expl.classList.add('show');
+  }));
+});
+</script>
+</body>
+</html>

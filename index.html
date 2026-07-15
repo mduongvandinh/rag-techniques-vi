@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG Techniques — Sổ tay học tập tương tác</title>
+<style>
+:root{
+  --bg:#F7F8FC; --surface:#FFFFFF; --ink:#16213A; --ink-soft:#4A5570;
+  --line:#DDE2EF; --primary:#3B4CC0; --primary-soft:#E8EBFA;
+  --amber:#B97C1D; --amber-soft:#FBF3E2; --teal:#1F8A70; --teal-soft:#E3F4EF;
+  --rose:#B0455A; --rose-soft:#F9E9ED;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+  --sans:"Be Vietnam Pro","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.65;font-size:16px}
+.wrap{max-width:1060px;margin:0 auto;padding:0 24px}
+a{color:var(--primary)}
+
+/* Header */
+header{background:var(--ink);color:#EDF0FA;padding:56px 0 40px}
+.eyebrow{font-family:var(--mono);font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:#9FB0E8}
+header h1{font-size:clamp(1.9rem,4.5vw,2.9rem);font-weight:800;line-height:1.15;margin:.5rem 0 .8rem;letter-spacing:-.02em}
+header h1 em{font-style:normal;color:#FFC96B}
+header p.lead{max-width:640px;color:#C3CCE8;font-size:1.05rem}
+.header-meta{display:flex;gap:22px;flex-wrap:wrap;margin-top:20px;font-family:var(--mono);font-size:.82rem;color:#8E9CCB}
+.header-meta b{color:#FFC96B;font-size:1.05rem;display:block}
+.src{margin-top:14px;font-size:.85rem;color:#8E9CCB}
+.src a{color:#AEBBF0}
+
+/* Pipeline map */
+section{padding:52px 0}
+h2{font-size:1.5rem;font-weight:800;letter-spacing:-.01em;margin-bottom:6px}
+.sub{color:var(--ink-soft);margin-bottom:24px;max-width:700px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;overflow-x:auto}
+svg text{font-family:var(--sans)}
+.stage-note{font-family:var(--mono);font-size:.75rem;color:var(--ink-soft);margin-top:10px}
+
+/* Catalog */
+.cat-group{margin-bottom:34px}
+.cat-head{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+.cat-head h3{font-size:1.08rem;font-weight:700}
+.cat-head .count{font-family:var(--mono);font-size:.75rem;color:var(--ink-soft)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s, transform .15s}
+.card.ready:hover{border-color:var(--primary);transform:translateY(-2px)}
+.card .name{font-weight:700;font-size:.94rem;line-height:1.35}
+.card .desc{font-size:.82rem;color:var(--ink-soft);flex:1}
+.badges{display:flex;gap:6px;flex-wrap:wrap}
+.badge{font-family:var(--mono);font-size:.66rem;padding:2px 8px;border-radius:99px;letter-spacing:.03em}
+.lv1{background:var(--teal-soft);color:var(--teal)}
+.lv2{background:var(--amber-soft);color:var(--amber)}
+.lv3{background:var(--rose-soft);color:var(--rose)}
+.ready-tag{background:var(--primary-soft);color:var(--primary)}
+.soon{opacity:.62}
+.soon .name::after{content:" · Batch 2";font-family:var(--mono);font-size:.68rem;color:var(--ink-soft);font-weight:400}
+.card a{text-decoration:none;color:var(--primary);font-size:.84rem;font-weight:600}
+.card a:hover{text-decoration:underline}
+
+/* Matrix */
+table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:.9rem}
+th,td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--ink);color:#EDF0FA;font-size:.8rem;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+tr:last-child td{border-bottom:none}
+td code{font-family:var(--mono);font-size:.8rem;background:var(--primary-soft);color:var(--primary);padding:1px 7px;border-radius:6px;white-space:nowrap}
+.table-scroll{overflow-x:auto;border-radius:12px}
+
+/* Path */
+.path{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.path .step{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;border-top:4px solid var(--teal)}
+.path .step:nth-child(2){border-top-color:var(--amber)}
+.path .step:nth-child(3){border-top-color:var(--rose)}
+.path h4{font-size:1rem;margin-bottom:4px}
+.path .req{font-family:var(--mono);font-size:.72rem;color:var(--ink-soft);margin-bottom:8px}
+.path ul{list-style:none}
+.path li{padding:5px 0;border-bottom:1px dashed var(--line);font-size:.88rem}
+.path li:last-child{border-bottom:none}
+
+footer{padding:36px 0 56px;color:var(--ink-soft);font-size:.85rem;border-top:1px solid var(--line);margin-top:20px}
+@media (max-width:640px){ body{font-size:15px} th,td{padding:9px 10px} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="eyebrow">Sổ tay tương tác · Tiếng Việt · 35/35 hoàn tất</div>
+    <h1>Kỹ thuật RAG: từ <em>truy xuất cơ bản</em> đến <em>kiến trúc nâng cao</em></h1>
+    <p class="lead">Chuyển hóa toàn bộ kho kỹ thuật Retrieval-Augmented Generation thành tài liệu học tập trực quan: mỗi kỹ thuật đi từ vấn đề → cơ chế → sơ đồ → demo mô phỏng → khi nào dùng.</p>
+    <div class="header-meta">
+      <div><b>35</b>kỹ thuật</div>
+      <div><b>8</b>nhóm chủ đề</div>
+      <div><b>3</b>cấp độ học</div>
+      <div><b>35</b>bài chi tiết · <b style="color:#5BC0A0">hoàn tất</b></div>
+    </div>
+    <div class="src">Nguồn: repo <a href="https://github.com/NirDiamant/RAG_Techniques" target="_blank" rel="noopener">NirDiamant/RAG_Techniques</a> (27k+ ⭐). Tài liệu này diễn giải lại bằng tiếng Việt, không thay thế notebook gốc.</div>
+  </div>
+</header>
+
+<!-- ======================= PIPELINE MAP ======================= -->
+<section id="pipeline">
+  <div class="wrap">
+    <h2>Bản đồ pipeline: kỹ thuật nào nằm ở đâu?</h2>
+    <p class="sub">Mọi kỹ thuật RAG đều can thiệp vào một (hoặc vài) giai đoạn của pipeline. Nhìn bản đồ này trước khi học từng kỹ thuật giúp bạn luôn biết mình đang tối ưu khâu nào.</p>
+    <div class="panel">
+      <svg viewBox="0 0 980 330" width="100%" style="min-width:760px" role="img" aria-label="Sơ đồ pipeline RAG với các kỹ thuật theo giai đoạn">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4A5570"/></marker>
+        </defs>
+        <!-- rail -->
+        <line x1="30" y1="70" x2="950" y2="70" stroke="#DDE2EF" stroke-width="2"/>
+        <!-- stages -->
+        <g font-size="13" font-weight="700" fill="#16213A" text-anchor="middle">
+          <g>
+            <rect x="30" y="46" width="150" height="48" rx="10" fill="#E3F4EF" stroke="#1F8A70"/>
+            <text x="105" y="66">1 · Lập chỉ mục</text>
+            <text x="105" y="84" font-weight="400" font-size="11" fill="#4A5570">Indexing</text>
+          </g>
+          <g>
+            <rect x="220" y="46" width="150" height="48" rx="10" fill="#E8EBFA" stroke="#3B4CC0"/>
+            <text x="295" y="66">2 · Truy vấn</text>
+            <text x="295" y="84" font-weight="400" font-size="11" fill="#4A5570">Query</text>
+          </g>
+          <g>
+            <rect x="410" y="46" width="150" height="48" rx="10" fill="#E8EBFA" stroke="#3B4CC0"/>
+            <text x="485" y="66">3 · Truy xuất</text>
+            <text x="485" y="84" font-weight="400" font-size="11" fill="#4A5570">Retrieval</text>
+          </g>
+          <g>
+            <rect x="600" y="46" width="150" height="48" rx="10" fill="#FBF3E2" stroke="#B97C1D"/>
+            <text x="675" y="66">4 · Hậu xử lý</text>
+            <text x="675" y="84" font-weight="400" font-size="11" fill="#4A5570">Post-retrieval</text>
+          </g>
+          <g>
+            <rect x="790" y="46" width="150" height="48" rx="10" fill="#F9E9ED" stroke="#B0455A"/>
+            <text x="865" y="66">5 · Sinh + Đánh giá</text>
+            <text x="865" y="84" font-weight="400" font-size="11" fill="#4A5570">Generate · Eval</text>
+          </g>
+        </g>
+        <g stroke="#4A5570" stroke-width="1.6">
+          <line x1="180" y1="70" x2="216" y2="70" marker-end="url(#arr)"/>
+          <line x1="370" y1="70" x2="406" y2="70" marker-end="url(#arr)"/>
+          <line x1="560" y1="70" x2="596" y2="70" marker-end="url(#arr)"/>
+          <line x1="750" y1="70" x2="786" y2="70" marker-end="url(#arr)"/>
+        </g>
+        <!-- technique lists -->
+        <g font-size="11.5" fill="#4A5570">
+          <g transform="translate(38,118)">
+            <text y="0" font-weight="700" fill="#1F8A70">Kỹ thuật:</text>
+            <text y="20">· Chunk size tối ưu</text>
+            <text y="38" font-weight="700" fill="#16213A">· Semantic Chunking ★</text>
+            <text y="56">· Proposition Chunking</text>
+            <text y="74">· Chunk Headers (CCH)</text>
+            <text y="92">· Document Augmentation</text>
+            <text y="110">· HyPE</text>
+            <text y="128">· Hierarchical / RAPTOR</text>
+          </g>
+          <g transform="translate(228,118)">
+            <text y="0" font-weight="700" fill="#3B4CC0">Kỹ thuật:</text>
+            <text y="20" font-weight="700" fill="#16213A">· Query Transformations ★</text>
+            <text y="38" font-weight="700" fill="#16213A">· HyDE ★</text>
+            <text y="56">· Adaptive Retrieval</text>
+          </g>
+          <g transform="translate(418,118)">
+            <text y="0" font-weight="700" fill="#3B4CC0">Kỹ thuật:</text>
+            <text y="20" font-weight="700" fill="#16213A">· Fusion Retrieval ★</text>
+            <text y="38">· Multi-faceted Filtering</text>
+            <text y="56">· Dartboard Retrieval</text>
+            <text y="74">· Graph RAG / Microsoft</text>
+            <text y="92">· Multi-modal RAG</text>
+            <text y="110">· MemoRAG</text>
+          </g>
+          <g transform="translate(608,118)">
+            <text y="0" font-weight="700" fill="#B97C1D">Kỹ thuật:</text>
+            <text y="20" font-weight="700" fill="#16213A">· Reranking ★</text>
+            <text y="38">· Contextual Compression</text>
+            <text y="56">· Relevant Segment Extr.</text>
+            <text y="74">· Context Window Enrich.</text>
+            <text y="92">· Explainable Retrieval</text>
+          </g>
+          <g transform="translate(798,118)">
+            <text y="0" font-weight="700" fill="#B0455A">Kỹ thuật:</text>
+            <text y="20">· Self-RAG · CRAG</text>
+            <text y="38">· Feedback Loop</text>
+            <text y="56">· Agentic RAG</text>
+            <text y="74">· DeepEval · GroUSE</text>
+            <text y="92">· End-to-End Eval</text>
+            <text y="110">· Open-RAG-Eval</text>
+          </g>
+        </g>
+      </svg>
+      <div class="stage-note">★ = có bài chi tiết trong Batch 1. Nhiều kỹ thuật vòng lặp (Self-RAG, CRAG) thực chất bao trùm cả giai đoạn 2→5.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= CATALOG ======================= -->
+<section id="catalog" style="background:#EFF1F9">
+  <div class="wrap">
+    <h2>Danh mục 35 kỹ thuật theo nhóm</h2>
+    <p class="sub">Nhãn cấp độ: <span class="badge lv1">Cấp 1 · Nền tảng</span> <span class="badge lv2">Cấp 2 · Trung cấp</span> <span class="badge lv3">Cấp 3 · Nâng cao</span>. Thẻ có viền xanh khi rê chuột là bài đã hoàn thành.</p>
+
+    <div class="cat-group">
+      <div class="cat-head"><h3>🌱 Nền tảng</h3><span class="count">5 kỹ thuật · 5 bài chi tiết</span></div>
+      <div class="grid">
+        <div class="card ready"><div class="name">Simple RAG</div><div class="desc">Pipeline chuẩn: chunk → embed → tìm kiếm vector → sinh câu trả lời.</div><div class="badges"><span class="badge lv1">Cấp 1</span><span class="badge ready-tag">Batch 2</span></div><a href="03-foundational.html#simple">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Chọn Chunk Size</div><div class="desc">Cân bằng giữa giữ ngữ cảnh và độ chính xác khớp.</div><div class="badges"><span class="badge lv1">Cấp 1</span><span class="badge ready-tag">Batch 2</span></div><a href="03-foundational.html#chunksize">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Reliable RAG</div><div class="desc">Thêm bước chấm độ liên quan; biết nói "không đủ dữ liệu".</div><div class="badges"><span class="badge lv1">Cấp 1</span><span class="badge ready-tag">Batch 2</span></div><a href="03-foundational.html#reliable">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Proposition Chunking</div><div class="desc">Tách văn bản thành các mệnh đề độc lập, tự đủ nghĩa.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 2</span></div><a href="03-foundational.html#proposition">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">RAG với CSV / JSON</div><div class="desc">Làm phẳng bản ghi có cấu trúc thành text trước khi embed.</div><div class="badges"><span class="badge lv1">Cấp 1</span><span class="badge ready-tag">Batch 2</span></div><a href="03-foundational.html#csv">Đọc bài →</a></div>
+      </div>
+    </div>
+
+    <div class="cat-group">
+      <div class="cat-head"><h3>🔍 Nâng cấp truy vấn (Query Enhancement)</h3><span class="count">3 kỹ thuật · 2 bài chi tiết</span></div>
+      <div class="grid">
+        <div class="card ready"><div class="name">Query Transformations</div><div class="desc">Rewrite · Step-back · Decompose — sửa truy vấn trước khi tìm.</div><div class="badges"><span class="badge lv1">Cấp 1</span><span class="badge ready-tag">Batch 1</span></div><a href="01-query-enhancement.html#qt">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">HyDE</div><div class="desc">Sinh tài liệu giả định rồi dùng nó để tìm — thu hẹp khoảng cách câu hỏi ↔ câu trả lời.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 1</span></div><a href="01-query-enhancement.html#hyde">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">HyPE</div><div class="desc">Như HyDE nhưng dời chi phí LLM về lúc lập chỉ mục — query time không tốn thêm.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 1</span></div><a href="01-query-enhancement.html#hyde">Đọc bài →</a></div>
+      </div>
+    </div>
+
+    <div class="cat-group">
+      <div class="cat-head"><h3>📚 Làm giàu ngữ cảnh (Context Enrichment)</h3><span class="count">6 kỹ thuật · 6 bài chi tiết</span></div>
+      <div class="grid">
+        <div class="card ready"><div class="name">Semantic Chunking</div><div class="desc">Cắt tài liệu theo ranh giới ngữ nghĩa thay vì đếm ký tự.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 1</span></div><a href="02-retrieval.html#semchunk">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Contextual Chunk Headers</div><div class="desc">Gắn tiêu đề tài liệu/mục vào đầu mỗi chunk trước khi embed.</div><div class="badges"><span class="badge lv1">Cấp 1</span><span class="badge ready-tag">Batch 3</span></div><a href="04-context-enrichment.html#cch">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Relevant Segment Extraction</div><div class="desc">Ghép động nhiều chunk liền kề thành đoạn dài liên quan.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 3</span></div><a href="04-context-enrichment.html#rse">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Context Window Enhancement</div><div class="desc">Embed từng câu, khi truy xuất lấy thêm câu trước/sau.</div><div class="badges"><span class="badge lv1">Cấp 1</span><span class="badge ready-tag">Batch 3</span></div><a href="04-context-enrichment.html#window">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Contextual Compression</div><div class="desc">Dùng LLM nén chunk đã truy xuất, giữ phần liên quan truy vấn.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 3</span></div><a href="04-context-enrichment.html#compress">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Document Augmentation</div><div class="desc">Sinh câu hỏi khả dĩ cho từng đoạn để tăng khả năng khớp.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 3</span></div><a href="04-context-enrichment.html#augment">Đọc bài →</a></div>
+      </div>
+    </div>
+
+    <div class="cat-group">
+      <div class="cat-head"><h3>🚀 Truy xuất nâng cao (Advanced Retrieval)</h3><span class="count">6 kỹ thuật · 6 bài chi tiết</span></div>
+      <div class="grid">
+        <div class="card ready"><div class="name">Fusion Retrieval</div><div class="desc">Kết hợp BM25 (từ khóa) + vector (ngữ nghĩa) trong một lần tìm.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 1</span></div><a href="02-retrieval.html#fusion">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Reranking</div><div class="desc">Cross-encoder chấm lại top-k để đẩy tài liệu đúng nhất lên đầu.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 1</span></div><a href="02-retrieval.html#rerank">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Multi-faceted Filtering</div><div class="desc">Lọc theo metadata, ngưỡng điểm, nội dung, độ đa dạng.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 4</span></div><a href="05-advanced-retrieval.html#filter">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Hierarchical Indices</div><div class="desc">Hai tầng: tóm tắt tài liệu → chunk chi tiết.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 4</span></div><a href="05-advanced-retrieval.html#hier">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Dartboard Retrieval</div><div class="desc">Tối ưu đồng thời độ liên quan + độ đa dạng trong một hàm điểm.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 4</span></div><a href="05-advanced-retrieval.html#dart">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Multi-modal RAG</div><div class="desc">Captioning hoặc ColPali cho tài liệu có ảnh, bảng, slide.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 4</span></div><a href="05-advanced-retrieval.html#multimodal">Đọc bài →</a></div>
+      </div>
+    </div>
+
+    <div class="cat-group">
+      <div class="cat-head"><h3>🔁 Vòng lặp & thích ứng</h3><span class="count">2 kỹ thuật · 2 bài chi tiết</span></div>
+      <div class="grid">
+        <div class="card ready"><div class="name">Retrieval with Feedback Loop</div><div class="desc">Học từ phản hồi người dùng để cải thiện truy xuất về sau.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 5</span></div><a href="06-iterative-adaptive.html#feedback">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Adaptive Retrieval</div><div class="desc">Phân loại truy vấn rồi chọn chiến lược truy xuất phù hợp.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 5</span></div><a href="06-iterative-adaptive.html#adaptive">Đọc bài →</a></div>
+      </div>
+    </div>
+
+    <div class="cat-group">
+      <div class="cat-head"><h3>🏗️ Kiến trúc nâng cao</h3><span class="count">8 kỹ thuật · 8 bài chi tiết</span></div>
+      <div class="grid">
+        <div class="card ready"><div class="name">RAPTOR</div><div class="desc">Cây tóm tắt đệ quy — truy xuất được cả chi tiết lẫn tổng quan.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 6</span></div><a href="07-advanced-architectures.html#raptor">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Graph RAG (LangChain / Milvus)</div><div class="desc">Truy xuất theo quan hệ thực thể kết hợp vector search.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 6</span></div><a href="07-advanced-architectures.html#graphrag">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Microsoft GraphRAG</div><div class="desc">Trích thực thể + cộng đồng, tóm tắt từ dưới lên.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 6</span></div><a href="07-advanced-architectures.html#msgraph">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Self-RAG</div><div class="desc">Mô hình tự quyết định khi nào cần truy xuất, tự chấm độ hữu ích.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 6</span></div><a href="07-advanced-architectures.html#selfrag">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Corrective RAG (CRAG)</div><div class="desc">Đánh giá kết quả truy xuất; nếu kém thì tinh lọc hoặc tìm web.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 6</span></div><a href="07-advanced-architectures.html#crag">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Agentic RAG</div><div class="desc">Pipeline dạng agent: reformulate → parse → rerank → grounded LLM.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 6</span></div><a href="07-advanced-architectures.html#agentic">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">MemoRAG</div><div class="desc">Bộ nhớ key–value + surrogate query cho truy xuất đa truy vấn.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 6</span></div><a href="07-advanced-architectures.html#memorag">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Controllable RAG Agent</div><div class="desc">Đồ thị xác định làm "bộ não" điều khiển agent trả lời câu hỏi khó.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 6</span></div><a href="07-advanced-architectures.html#controllable">Đọc bài →</a></div>
+      </div>
+    </div>
+
+    <div class="cat-group">
+      <div class="cat-head"><h3>📊 Đánh giá & minh bạch</h3><span class="count">5 kỹ thuật · 5 bài chi tiết</span></div>
+      <div class="grid">
+        <div class="card ready"><div class="name">End-to-End RAG Evaluation</div><div class="desc">Chọn tiêu chí, LLM-as-judge, tích hợp RAGAS, lắp pipeline đầy đủ.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 7</span></div><a href="08-evaluation.html#e2e">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">DeepEval</div><div class="desc">Test case về correctness, faithfulness, contextual relevancy.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 7</span></div><a href="08-evaluation.html#deepeval">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">GroUSE</div><div class="desc">6 metric đánh giá sinh có căn cứ + meta-eval LLM judge.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 7</span></div><a href="08-evaluation.html#grouse">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Open-RAG-Eval</div><div class="desc">UMBRELA scoring, AutoNuggetizer, phát hiện hallucination.</div><div class="badges"><span class="badge lv3">Cấp 3</span><span class="badge ready-tag">Batch 7</span></div><a href="08-evaluation.html#openrag">Đọc bài →</a></div>
+        <div class="card ready"><div class="name">Explainable Retrieval</div><div class="desc">Giải thích vì sao từng đoạn được truy xuất.</div><div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge ready-tag">Batch 7</span></div><a href="08-evaluation.html#explain">Đọc bài →</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= MATRIX ======================= -->
+<section id="matrix">
+  <div class="wrap">
+    <h2>Ma trận: gặp tình huống nào, dùng kỹ thuật nào?</h2>
+    <p class="sub">Bảng tra nhanh theo triệu chứng thực tế — đây là cách kỹ sư chọn kỹ thuật, thay vì học lần lượt theo danh sách.</p>
+    <div class="table-scroll">
+    <table>
+      <thead><tr><th style="width:38%">Triệu chứng / tình huống</th><th>Kỹ thuật nên thử trước</th><th>Nếu chưa đủ</th></tr></thead>
+      <tbody>
+        <tr><td>Người dùng hỏi mơ hồ, sai chính tả, quá dài dòng → tìm ra tài liệu lạc đề</td><td><code>Query Transformations</code></td><td><code><a href="06-iterative-adaptive.html#adaptive" style="color:inherit">Adaptive Retrieval</a></code></td></tr>
+        <tr><td>Câu hỏi ngắn nhưng tài liệu trả lời dài, khác văn phong → vector search khớp kém</td><td><code>HyDE</code></td><td><code>HyPE</code> (nếu latency quan trọng), <code>Document Augmentation</code></td></tr>
+        <tr><td>Chunk bị cắt giữa chừng ý, câu trả lời thiếu ngữ cảnh</td><td><code>Semantic Chunking</code></td><td><code>Chunk Headers</code>, <code>RSE</code>, <code>Context Window</code></td></tr>
+        <tr><td>Truy vấn chứa mã số, tên riêng, thuật ngữ chính xác (mã lỗi, số phiên bản, mã sản phẩm) mà vector search bỏ sót</td><td><code>Fusion Retrieval</code></td><td>Điều chỉnh trọng số α, thêm <code>Metadata Filtering</code></td></tr>
+        <tr><td>Top-10 có tài liệu đúng nhưng nằm ở vị trí 6–10, LLM dùng nhầm tài liệu đầu</td><td><code>Reranking</code></td><td><code>Contextual Compression</code></td></tr>
+        <tr><td>Câu hỏi tổng hợp toàn tài liệu ("chủ đề chính của bộ hồ sơ là gì?")</td><td><code><a href="07-advanced-architectures.html#raptor" style="color:inherit">RAPTOR</a></code> / <code><a href="05-advanced-retrieval.html#hier" style="color:inherit">Hierarchical Indices</a></code></td><td><code><a href="07-advanced-architectures.html#msgraph" style="color:inherit">Microsoft GraphRAG</a></code></td></tr>
+        <tr><td>Câu hỏi nhiều bước, cần suy luận qua quan hệ thực thể</td><td><code><a href="07-advanced-architectures.html#graphrag" style="color:inherit">Graph RAG</a></code></td><td><code><a href="07-advanced-architectures.html#controllable" style="color:inherit">Controllable RAG Agent</a></code></td></tr>
+        <tr><td>Hệ thống hay trả lời khi kho không có dữ liệu → hallucination</td><td><code><a href="03-foundational.html#reliable" style="color:inherit">Reliable RAG</a></code>, <code><a href="07-advanced-architectures.html#selfrag" style="color:inherit">Self-RAG</a></code></td><td><code><a href="07-advanced-architectures.html#crag" style="color:inherit">CRAG</a></code> (bổ sung web search)</td></tr>
+        <tr><td>Không biết pipeline tốt lên hay xấu đi sau mỗi thay đổi</td><td><code><a href="08-evaluation.html#e2e" style="color:inherit">End-to-End Evaluation</a></code>, <code><a href="08-evaluation.html#deepeval" style="color:inherit">DeepEval</a></code></td><td><code><a href="08-evaluation.html#grouse" style="color:inherit">GroUSE</a></code>, <code><a href="08-evaluation.html#openrag" style="color:inherit">Open-RAG-Eval</a></code></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= LEARNING PATH ======================= -->
+<section id="path" style="background:#EFF1F9">
+  <div class="wrap">
+    <h2>Lộ trình học 3 cấp</h2>
+    <p class="sub">Mỗi cấp giả định bạn đã vững cấp trước. Batch 1 phủ phần lõi của Cấp 1–2, nơi 80% cải thiện chất lượng thực tế đến từ đó.</p>
+    <div class="path">
+      <div class="step">
+        <h4>Cấp 1 · Nền tảng</h4>
+        <div class="req">Yêu cầu: hiểu embedding & vector search cơ bản</div>
+        <ul>
+          <li><a href="03-foundational.html#simple">Simple RAG ★</a></li>
+          <li><a href="03-foundational.html#chunksize">Chọn chunk size ★</a> · <a href="03-foundational.html#reliable">Reliable RAG ★</a></li>
+          <li><a href="01-query-enhancement.html#qt">Query Transformations ★</a></li>
+          <li><a href="04-context-enrichment.html#cch">Contextual Chunk Headers ★</a></li>
+        </ul>
+      </div>
+      <div class="step">
+        <h4>Cấp 2 · Trung cấp</h4>
+        <div class="req">Yêu cầu: đã chạy pipeline RAG thật, biết đo recall</div>
+        <ul>
+          <li><a href="01-query-enhancement.html#hyde">HyDE ★</a> → HyPE</li>
+          <li><a href="02-retrieval.html#semchunk">Semantic Chunking ★</a></li>
+          <li><a href="02-retrieval.html#fusion">Fusion Retrieval ★</a></li>
+          <li><a href="02-retrieval.html#rerank">Reranking ★</a></li>
+          <li><a href="04-context-enrichment.html#compress">Contextual Compression ★</a> · <a href="08-evaluation.html#e2e">Đánh giá cơ bản ★</a></li>
+        </ul>
+      </div>
+      <div class="step">
+        <h4>Cấp 3 · Nâng cao</h4>
+        <div class="req">Yêu cầu: có bộ eval để đo được lợi ích/chi phí</div>
+        <ul>
+          <li><a href="07-advanced-architectures.html#raptor">RAPTOR ★</a> · <a href="05-advanced-retrieval.html#hier">Hierarchical Indices ★</a></li>
+          <li><a href="07-advanced-architectures.html#graphrag">Graph RAG ★</a> · <a href="07-advanced-architectures.html#msgraph">MS GraphRAG ★</a></li>
+          <li><a href="07-advanced-architectures.html#selfrag">Self-RAG ★</a> · <a href="07-advanced-architectures.html#crag">CRAG ★</a> · <a href="07-advanced-architectures.html#agentic">Agentic ★</a></li>
+          <li><a href="07-advanced-architectures.html#memorag">MemoRAG ★</a> · <a href="06-iterative-adaptive.html#adaptive">Adaptive Retrieval ★</a></li>
+          <li><a href="08-evaluation.html#grouse">GroUSE ★</a> · <a href="08-evaluation.html#openrag">Open-RAG-Eval ★</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    Tài liệu học tập diễn giải từ repo <a href="https://github.com/NirDiamant/RAG_Techniques">NirDiamant/RAG_Techniques</a> (giấy phép phi thương mại — dùng cho mục đích học tập). Hoàn tất 35/35 kỹ thuật qua 7 batch — mọi thẻ đều có bài chi tiết kèm demo tương tác.
+  </div>
+</footer>
+
+</body>
+</html>

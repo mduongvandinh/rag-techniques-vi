@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nền tảng RAG: Simple RAG, Chunk Size, Reliable RAG, Proposition Chunking — Sổ tay RAG</title>
+<style>
+:root{
+  --bg:#F7F8FC; --surface:#FFFFFF; --ink:#16213A; --ink-soft:#4A5570;
+  --line:#DDE2EF; --primary:#3B4CC0; --primary-soft:#E8EBFA;
+  --amber:#B97C1D; --amber-soft:#FBF3E2; --teal:#1F8A70; --teal-soft:#E3F4EF;
+  --rose:#B0455A; --rose-soft:#F9E9ED;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+  --sans:"Be Vietnam Pro","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.7;font-size:16.5px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px}
+a{color:var(--primary)}
+#progress{position:fixed;top:0;left:0;height:3px;background:var(--primary);width:0;z-index:99}
+header{background:var(--ink);color:#EDF0FA;padding:44px 0 34px}
+.crumb{font-family:var(--mono);font-size:.78rem;color:#9FB0E8}
+.crumb a{color:#9FB0E8;text-decoration:none}
+.crumb a:hover{text-decoration:underline}
+header h1{font-size:clamp(1.7rem,4vw,2.4rem);font-weight:800;margin:.5rem 0;letter-spacing:-.02em;line-height:1.2}
+header p{color:#C3CCE8;max-width:660px}
+.rail-panel{background:#101830;padding:14px 0 20px}
+.rail-panel svg{display:block;margin:0 auto}
+nav.toc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:26px auto;max-width:860px}
+nav.toc b{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+nav.toc ol{margin:8px 0 0 20px}
+nav.toc li{padding:2px 0}
+section.tech{padding:36px 0 10px}
+.tech-head{border-left:5px solid var(--teal);padding-left:16px;margin-bottom:20px}
+.tech-head .kicker{font-family:var(--mono);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--teal)}
+.tech-head h2{font-size:1.7rem;font-weight:800}
+.badges{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.badge{font-family:var(--mono);font-size:.68rem;padding:2px 9px;border-radius:99px}
+.lv1{background:var(--teal-soft);color:var(--teal)} .lv2{background:var(--amber-soft);color:var(--amber)}
+.stage{background:var(--primary-soft);color:var(--primary)}
+.stage-idx{background:var(--teal-soft);color:var(--teal)}
+.stage-all{background:var(--rose-soft);color:var(--rose)}
+h3{font-size:1.12rem;font-weight:700;margin:28px 0 8px}
+p{margin-bottom:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0;overflow-x:auto}
+.problem{border-left:4px solid var(--rose);background:var(--rose-soft)}
+.insight{border-left:4px solid var(--teal);background:var(--teal-soft)}
+.problem b,.insight b{display:block;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.problem b{color:var(--rose)} .insight b{color:var(--teal)}
+pre{background:#101830;color:#D9E0F5;font-family:var(--mono);font-size:.82rem;line-height:1.6;padding:16px 18px;border-radius:12px;overflow-x:auto;margin:14px 0}
+pre .c{color:#7A88B8} pre .k{color:#FFC96B} pre .s{color:#8FD3B6}
+code{font-family:var(--mono);font-size:.85em;background:var(--primary-soft);color:var(--primary);padding:1px 6px;border-radius:5px}
+pre code{background:none;color:inherit;padding:0}
+.demo{background:var(--surface);border:2px solid var(--teal);border-radius:14px;padding:20px;margin:18px 0}
+.demo .demo-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--teal);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.demo .demo-tag::before{content:"▶";font-size:.6rem}
+.controls{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;align-items:center}
+button{font-family:var(--sans);font-size:.9rem;padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+button.primary{background:var(--teal);border-color:var(--teal);color:#fff;font-weight:600}
+button.primary:hover{background:#186E58}
+button.mode{border:1.5px solid var(--line)}
+button.mode.on{border-color:var(--teal);background:var(--teal-soft);color:var(--teal);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #9FB0E8;outline-offset:1px}
+input[type=range]{accent-color:var(--teal);width:220px}
+.slider-val{font-family:var(--mono);font-size:.82rem;background:var(--teal-soft);color:var(--teal);padding:2px 8px;border-radius:6px}
+.hint{font-size:.84rem;color:var(--ink-soft);margin-top:8px}
+
+/* simple rag pipeline demo */
+.pipe-stage{opacity:.35;transition:opacity .4s}
+.pipe-stage.active{opacity:1}
+.stagecap{font-size:.86rem;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-top:10px;min-height:44px}
+
+/* chunk-size demo */
+.metric-row{display:grid;grid-template-columns:150px 1fr 54px;gap:10px;align-items:center;margin:8px 0;font-size:.86rem}
+.mbar{height:12px;border-radius:6px;background:var(--line);overflow:hidden}
+.mbar i{display:block;height:100%;border-radius:6px;transition:width .3s}
+.mbar.a i{background:var(--primary)} .mbar.b i{background:var(--amber)} .mbar.c i{background:var(--teal)}
+.mval{font-family:var(--mono);font-size:.78rem;text-align:right}
+
+/* reliable rag demo */
+.doc-list{list-style:none;margin-top:10px}
+.doc-list li{display:grid;grid-template-columns:1fr 96px;gap:10px;align-items:center;border:1px solid var(--line);border-radius:9px;padding:9px 12px;margin-bottom:7px;background:var(--bg);font-size:.87rem;transition:all .3s}
+.doc-list li.kept{border-color:var(--teal);background:var(--teal-soft)}
+.doc-list li.dropped{opacity:.45;border-style:dashed;text-decoration:line-through}
+.doc-list .verdict{font-family:var(--mono);font-size:.72rem;text-align:right}
+.answer-box{border-radius:10px;padding:12px 14px;margin-top:12px;font-size:.9rem;border:1.5px solid}
+.answer-box.bad{background:var(--rose-soft);border-color:var(--rose)}
+.answer-box.good{background:var(--teal-soft);border-color:var(--teal)}
+.answer-box b{display:block;font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px}
+
+/* proposition demo */
+.prop-src{font-size:.88rem;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:11px 13px}
+.prop-out{list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.prop-out li{font-size:.85rem;border:1.5px solid var(--line);border-radius:9px;padding:8px 12px;background:#fff;display:flex;gap:8px;align-items:flex-start;transition:all .3s}
+.prop-out li .n{font-family:var(--mono);font-size:.72rem;color:var(--teal);font-weight:700;flex-shrink:0}
+.prop-out li.match{border-color:var(--teal);background:var(--teal-soft)}
+.qrow{font-family:var(--mono);font-size:.84rem;background:var(--ink);color:#D9E0F5;border-radius:9px;padding:9px 12px;margin:12px 0 4px}
+
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.duo .col{border-radius:12px;padding:16px 18px}
+.duo .yes{background:var(--teal-soft);border:1px solid #BADFD2}
+.duo .no{background:var(--rose-soft);border:1px solid #EBC6CE}
+.duo h4{font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.duo .yes h4{color:var(--teal)} .duo .no h4{color:var(--rose)}
+.duo ul{margin-left:18px;font-size:.9rem}
+.duo li{margin-bottom:6px}
+@media (max-width:620px){.duo{grid-template-columns:1fr}}
+.quiz{background:var(--amber-soft);border:1px solid #EAD9B4;border-radius:14px;padding:20px;margin:20px 0}
+.quiz .q-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:8px}
+.quiz p.q{font-weight:600;margin-bottom:10px}
+.quiz .opts{display:flex;flex-direction:column;gap:8px}
+.quiz .opt{text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:9px 13px;font-size:.92rem;cursor:pointer}
+.quiz .opt:hover{border-color:var(--amber)}
+.quiz .opt.right{border-color:var(--teal);background:var(--teal-soft)}
+.quiz .opt.wrong{border-color:var(--rose);background:var(--rose-soft)}
+.quiz .expl{display:none;margin-top:10px;font-size:.88rem;background:#fff;border-radius:9px;padding:10px 13px}
+.quiz .expl.show{display:block}
+table{width:100%;border-collapse:collapse;background:var(--surface);font-size:.88rem}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--ink);color:#EDF0FA;font-size:.76rem;text-transform:uppercase;letter-spacing:.05em}
+.table-scroll{overflow-x:auto;border-radius:12px;border:1px solid var(--line);margin:14px 0}
+.summary{background:var(--ink);color:#D9E0F5;border-radius:14px;padding:24px;margin:30px 0}
+.summary h3{color:#FFC96B;margin-top:0}
+.summary ul{margin-left:20px}
+.summary li{margin-bottom:8px}
+.nav-next{display:flex;justify-content:space-between;gap:12px;padding:10px 0 50px;flex-wrap:wrap}
+.nav-next a{text-decoration:none;font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 18px}
+.nav-next a:hover{border-color:var(--primary)}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<header>
+  <div class="wrap">
+    <div class="crumb"><a href="index.html">← Trang tổng quan</a> · Nhóm Nền tảng · Batch 2</div>
+    <h1>Nền tảng RAG — bốn viên gạch đầu tiên</h1>
+    <p>Trước khi chạm tới GraphRAG hay Self-RAG, phải nắm chắc bộ khung: <b>một pipeline RAG chạy được</b>, <b>cắt chunk to nhỏ ra sao</b>, làm sao để hệ thống <b>biết im lặng khi không có dữ liệu</b>, và <b>đơn vị lập chỉ mục nhỏ nhất</b> nên là gì. Đây là nơi 80% lỗi RAG thực tế bắt nguồn.</p>
+  </div>
+</header>
+
+<div class="rail-panel">
+  <svg viewBox="0 0 760 56" width="100%" style="max-width:820px" role="img" aria-label="Nhóm nền tảng phủ toàn bộ pipeline">
+    <line x1="20" y1="28" x2="740" y2="28" stroke="#2A3560" stroke-width="2"/>
+    <g font-size="11" text-anchor="middle">
+      <circle cx="80" cy="28" r="10" fill="#FFC96B"/><text x="80" y="52" fill="#FFC96B" font-weight="700">Lập chỉ mục</text>
+      <circle cx="240" cy="28" r="10" fill="#FFC96B"/><text x="240" y="52" fill="#FFC96B" font-weight="700">Truy vấn</text>
+      <circle cx="400" cy="28" r="10" fill="#FFC96B"/><text x="400" y="52" fill="#FFC96B" font-weight="700">Truy xuất</text>
+      <circle cx="560" cy="28" r="10" fill="#FFC96B"/><text x="560" y="52" fill="#FFC96B" font-weight="700">Hậu xử lý</text>
+      <circle cx="700" cy="28" r="10" fill="#FFC96B"/><text x="700" y="52" fill="#FFC96B" font-weight="700">Sinh</text>
+    </g>
+    <text x="380" y="14" text-anchor="middle" font-size="11" fill="#6C7BB0">Nhóm nền tảng chạm vào MỌI giai đoạn — đây là bộ khung cả pipeline dựa trên</text>
+  </svg>
+</div>
+
+<nav class="toc wrap">
+  <b>Trong bài này</b>
+  <ol>
+    <li><a href="#simple">Simple RAG</a> — pipeline chuẩn 4 bước</li>
+    <li><a href="#chunksize">Choose Chunk Size</a> — đánh đổi ngữ cảnh ↔ độ chính xác</li>
+    <li><a href="#reliable">Reliable RAG</a> — dạy hệ thống biết "không đủ dữ liệu"</li>
+    <li><a href="#proposition">Proposition Chunking</a> — đơn vị nhỏ nhất, tự đủ nghĩa</li>
+    <li><a href="#csv">RAG với CSV / JSON</a> — dữ liệu bảng & bán cấu trúc</li>
+    <li><a href="#compare">Tổng kết & bước tiếp</a></li>
+  </ol>
+</nav>
+
+<!-- ================= SIMPLE RAG ================= -->
+<section class="tech" id="simple">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 1/5</div>
+      <h2>Simple RAG</h2>
+      <div class="badges"><span class="badge lv1">Cấp 1</span><span class="badge stage-all">Toàn pipeline</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      LLM chỉ biết những gì có trong dữ liệu huấn luyện — nó không biết tài liệu nội bộ của bạn, và khi không biết thì hay "bịa" (hallucinate). RAG giải bài toán này bằng cách <b>đưa tài liệu liên quan vào ngữ cảnh ngay lúc hỏi</b>, để LLM trả lời dựa trên nguồn thật thay vì trí nhớ mờ.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Bốn bước: <b>Cắt</b> tài liệu thành chunk → <b>Nhúng</b> mỗi chunk thành vector và lưu → khi có câu hỏi thì <b>Tìm</b> chunk gần nhất → nhét chunk + câu hỏi vào prompt để LLM <b>Sinh</b> câu trả lời. Mọi kỹ thuật RAG khác trong sổ tay này chỉ là cách làm <i>tốt hơn</i> một trong bốn bước đó.
+    </div>
+
+    <div class="demo" id="sr-demo">
+      <div class="demo-tag">Demo mô phỏng — chạy pipeline từng bước</div>
+      <p style="font-size:.9rem">Nhấn "Bước tiếp" để đi qua 4 giai đoạn với câu hỏi mẫu <span class="slider-val">"SDK có hỗ trợ retry tự động không?"</span></p>
+      <div class="controls">
+        <button class="primary" id="sr-next">Bước 1: Cắt tài liệu ▸</button>
+        <button id="sr-reset">↺ Làm lại</button>
+      </div>
+      <svg viewBox="0 0 800 130" width="100%" style="min-width:640px" role="img" aria-label="Pipeline Simple RAG 4 bước">
+        <defs><marker id="sa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4A5570"/></marker></defs>
+        <g class="pipe-stage" data-s="1" id="srs1">
+          <rect x="14" y="40" width="150" height="52" rx="10" fill="#E3F4EF" stroke="#1F8A70"/>
+          <text x="89" y="62" text-anchor="middle" font-size="12.5" font-weight="700">① Cắt (Chunk)</text>
+          <text x="89" y="80" text-anchor="middle" font-size="10.5" fill="#4A5570">tài liệu → mảnh nhỏ</text>
+        </g>
+        <g class="pipe-stage" data-s="2" id="srs2">
+          <rect x="210" y="40" width="150" height="52" rx="10" fill="#E8EBFA" stroke="#3B4CC0"/>
+          <text x="285" y="62" text-anchor="middle" font-size="12.5" font-weight="700">② Nhúng (Embed)</text>
+          <text x="285" y="80" text-anchor="middle" font-size="10.5" fill="#4A5570">mảnh → vector, lưu DB</text>
+        </g>
+        <g class="pipe-stage" data-s="3" id="srs3">
+          <rect x="406" y="40" width="150" height="52" rx="10" fill="#FBF3E2" stroke="#B97C1D"/>
+          <text x="481" y="62" text-anchor="middle" font-size="12.5" font-weight="700">③ Tìm (Retrieve)</text>
+          <text x="481" y="80" text-anchor="middle" font-size="10.5" fill="#4A5570">chunk gần câu hỏi nhất</text>
+        </g>
+        <g class="pipe-stage" data-s="4" id="srs4">
+          <rect x="602" y="40" width="150" height="52" rx="10" fill="#F9E9ED" stroke="#B0455A"/>
+          <text x="677" y="62" text-anchor="middle" font-size="12.5" font-weight="700">④ Sinh (Generate)</text>
+          <text x="677" y="80" text-anchor="middle" font-size="10.5" fill="#4A5570">LLM trả lời có nguồn</text>
+        </g>
+        <g stroke="#4A5570" stroke-width="1.6">
+          <line x1="164" y1="66" x2="206" y2="66" marker-end="url(#sa)"/>
+          <line x1="360" y1="66" x2="402" y2="66" marker-end="url(#sa)"/>
+          <line x1="556" y1="66" x2="598" y2="66" marker-end="url(#sa)"/>
+        </g>
+      </svg>
+      <div class="stagecap" id="sr-cap">Nhấn "Bước tiếp" để bắt đầu. Ba bước đầu (①②) làm <b>trước</b>, một lần khi nạp dữ liệu; hai bước sau (③④) chạy <b>mỗi lần</b> có câu hỏi.</div>
+    </div>
+
+<pre><code><span class="c"># Lập chỉ mục (làm một lần)</span>
+chunks = split(documents, size=500)
+store  = VectorStore([(embed(c), c) <span class="k">for</span> c <span class="k">in</span> chunks])
+
+<span class="c"># Truy vấn (mỗi câu hỏi)</span>
+top    = store.search(embed(question), k=4)
+answer = llm(prompt=f<span class="s">"Dựa trên: {top}\nTrả lời: {question}"</span>)</code></pre>
+
+    <div class="quiz" data-answer="1">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Trong Simple RAG, bước nào KHÔNG chạy lại mỗi khi người dùng đặt câu hỏi mới?</p>
+      <div class="opts">
+        <button class="opt">Tìm chunk gần nhất (Retrieve)</button>
+        <button class="opt">Cắt & nhúng tài liệu (Chunk + Embed)</button>
+        <button class="opt">Sinh câu trả lời (Generate)</button>
+      </div>
+      <div class="expl">Cắt và nhúng là bước <b>lập chỉ mục</b> — làm một lần khi nạp dữ liệu, kết quả lưu sẵn trong vector store. Chỉ Tìm + Sinh chạy real-time. Hiểu rõ ranh giới index-time / query-time là chìa khóa để biết mỗi kỹ thuật nâng cao "trả chi phí" ở đâu.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CHUNK SIZE ================= -->
+<section class="tech" id="chunksize">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 2/5</div>
+      <h2>Choose Chunk Size</h2>
+      <div class="badges"><span class="badge lv1">Cấp 1</span><span class="badge stage-idx">Giai đoạn: Lập chỉ mục</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Kích thước chunk là siêu tham số ảnh hưởng lớn nhất mà người mới hay bỏ qua. Chọn sai một con số này thì mọi kỹ thuật phía sau đều gánh hậu quả — nhưng không có "con số vàng" dùng chung cho mọi tài liệu.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi — một sự đánh đổi</b>
+      Chunk <b>nhỏ</b>: embedding sắc nét, khớp truy vấn chính xác, nhưng mỗi mảnh thiếu ngữ cảnh xung quanh. Chunk <b>lớn</b>: giàu ngữ cảnh, nhưng embedding "pha loãng" nhiều ý → khớp mờ, và tốn token. Việc chọn size là tìm điểm cân bằng cho <i>chính tài liệu và loại câu hỏi của bạn</i>.
+    </div>
+
+    <div class="demo" id="cs-demo">
+      <div class="demo-tag">Demo mô phỏng — kéo để thấy đường đánh đổi</div>
+      <div class="controls">
+        <label for="cs-size" style="font-size:.88rem">Kích thước chunk:</label>
+        <input type="range" id="cs-size" min="80" max="1200" step="20" value="120">
+        <span class="slider-val"><span id="cs-size-val">120</span> ký tự</span>
+      </div>
+      <div class="metric-row"><span>Độ chính xác khớp</span><span class="mbar a"><i id="cs-prec"></i></span><span class="mval" id="cs-prec-v"></span></div>
+      <div class="metric-row"><span>Đầy đủ ngữ cảnh</span><span class="mbar b"><i id="cs-ctx"></i></span><span class="mval" id="cs-ctx-v"></span></div>
+      <div class="metric-row"><span>Chất lượng tổng</span><span class="mbar c"><i id="cs-tot"></i></span><span class="mval" id="cs-tot-v"></span></div>
+      <div class="hint" id="cs-hint"></div>
+    </div>
+    <p style="font-size:.9rem;color:var(--ink-soft)">Đường "chất lượng tổng" có hình chuông — cực đại ở vùng giữa. Đây là lý do phải <b>thử nghiệm nhiều size và đo bằng eval</b>, thay vì đoán. Với tài liệu có cấu trúc heading rõ (API reference, sổ tay kỹ thuật), "chunk" tự nhiên thường là một mục trọn vẹn thay vì một con số ký tự cố định.</p>
+
+    <div class="quiz" data-answer="0">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Người dùng thường hỏi câu cần tổng hợp thông tin trải dài nhiều đoạn ("tóm tắt toàn bộ chính sách X"). Chunk quá nhỏ gây vấn đề gì?</p>
+      <div class="opts">
+        <button class="opt">Mỗi chunk chỉ chứa mảnh vụn, LLM nhận các mẩu rời rạc không đủ để tổng hợp mạch lạc</button>
+        <button class="opt">Embedding trở nên quá chính xác nên không tìm được gì</button>
+        <button class="opt">Không vấn đề gì — chunk càng nhỏ càng tốt</button>
+      </div>
+      <div class="expl">Câu hỏi tổng hợp cần ngữ cảnh liền mạch. Chunk quá nhỏ khớp chính xác từng mẩu nhưng LLM phải "ghép hình" từ nhiều mảnh rời — dễ sót, dễ mâu thuẫn. Loại câu hỏi này thích chunk lớn hơn, hoặc các kỹ thuật như RSE / Hierarchical Indices (nhóm sau).</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= RELIABLE RAG ================= -->
+<section class="tech" id="reliable">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 3/5</div>
+      <h2>Reliable RAG</h2>
+      <div class="badges"><span class="badge lv1">Cấp 1</span><span class="badge stage-all">Giai đoạn: Hậu xử lý + Sinh</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Vector search <b>luôn</b> trả về top-k, kể cả khi kho không có gì thực sự liên quan — nó chỉ trả "những cái gần nhất", không phải "những cái đủ tốt". LLM nhận được tài liệu lạc đề vẫn ngoan ngoãn tạo câu trả lời, sinh ra hallucination nghe rất thuyết phục.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Chèn một <b>bộ chấm độ liên quan</b> (grader) giữa bước truy xuất và bước sinh: mỗi chunk bị hỏi "cái này có thực sự trả lời được câu hỏi không?". Chunk trượt bị loại. Nếu <i>không còn chunk nào</i>, hệ thống thành thật nói "không đủ dữ liệu" thay vì bịa.
+    </div>
+
+    <div class="demo" id="rl-demo">
+      <div class="demo-tag">Demo mô phỏng — bật/tắt bộ chấm độ liên quan</div>
+      <p style="font-size:.9rem">Câu hỏi: <span class="slider-val">"Cơ chế retry của SDK hoạt động thế nào?"</span> — vector search trả về 4 chunk, trong đó 2 chunk lạc đề nhưng "gần" về mặt từ ngữ.</p>
+      <div class="controls" role="group">
+        <button class="mode on" data-grade="off">Không có grader</button>
+        <button class="mode" data-grade="on">Bật grader</button>
+      </div>
+      <ul class="doc-list" id="rl-docs"></ul>
+      <div class="answer-box" id="rl-answer"></div>
+    </div>
+
+<pre><code>docs = retrieve(question, k=4)
+graded = [d <span class="k">for</span> d <span class="k">in</span> docs
+          <span class="k">if</span> llm(f<span class="s">"Chunk này có liên quan tới '{question}'? yes/no: {d}"</span>) == <span class="s">"yes"</span>]
+
+<span class="k">if</span> <span class="k">not</span> graded:
+    <span class="k">return</span> <span class="s">"Không tìm thấy thông tin đủ liên quan trong tài liệu."</span>  <span class="c"># thành thật</span>
+answer = llm(context=graded, question=question)</code></pre>
+
+    <div class="quiz" data-answer="2">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Vì sao Reliable RAG lại đặc biệt quan trọng khi câu trả lời sai gây hậu quả lớn (hướng dẫn vận hành, cấu hình hệ thống production)?</p>
+      <div class="opts">
+        <button class="opt">Vì các tình huống này có nhiều tài liệu hơn</button>
+        <button class="opt">Vì vector search chạy chậm hơn trong các tình huống này</button>
+        <button class="opt">Vì một câu trả lời bịa nghe-có-vẻ-đúng có thể khiến người dùng chạy sai lệnh, cấu hình sai production — "không biết" an toàn hơn "đoán sai"</button>
+      </div>
+      <div class="expl">Ở tình huống rủi ro cao, cái giá của một câu trả lời sai (chạy nhầm lệnh xoá dữ liệu, cấu hình sai hệ thống đang chạy) lớn hơn nhiều cái giá của việc nói "tôi không có đủ dữ liệu". Reliable RAG biến "im lặng khi không chắc" thành hành vi mặc định — nền tảng cho mọi hệ RAG production nghiêm túc.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PROPOSITION CHUNKING ================= -->
+<section class="tech" id="proposition">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 4/5</div>
+      <h2>Proposition Chunking</h2>
+      <div class="badges"><span class="badge lv2">Cấp 2</span><span class="badge stage-idx">Giai đoạn: Lập chỉ mục</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Một đoạn văn thường gói nhiều sự thật vào một khối. Khi embed cả đoạn, mỗi sự thật riêng lẻ bị "hòa tan" — truy vấn hỏi đúng một sự thật lại khớp mờ vì phải cạnh tranh với các ý khác trong cùng vector.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Dùng LLM tách đoạn văn thành các <b>mệnh đề (proposition)</b>: mỗi mệnh đề là <i>một sự thật, tự đủ nghĩa, không cần đọc câu khác để hiểu</i>. Lập chỉ mục theo mệnh đề → mỗi vector "sạch", khớp truy vấn sắc nét. Đây là đơn vị chunk nhỏ và tinh khiết nhất.
+    </div>
+
+    <div class="demo" id="pp-demo">
+      <div class="demo-tag">Demo mô phỏng — tách mệnh đề & xem khớp truy vấn</div>
+      <div class="prop-src" id="pp-src">"Thư viện được phát hành lần đầu năm 2015. Hiện hỗ trợ ba ngôn ngữ và có hơn 200 module. Timeout mặc định của HttpClient là 30 giây, chưa tính thời gian retry."</div>
+      <div class="controls">
+        <button class="primary" id="pp-split">Tách thành mệnh đề ▸</button>
+        <button id="pp-reset">↺ Làm lại</button>
+      </div>
+      <ul class="prop-out" id="pp-out"></ul>
+      <div id="pp-query-wrap" style="display:none">
+        <div class="qrow">Truy vấn: "HttpClient timeout mặc định bao lâu?"</div>
+        <div class="controls">
+          <button class="mode" data-t="raw">Tìm trên đoạn thô</button>
+          <button class="mode" data-t="prop">Tìm trên mệnh đề</button>
+        </div>
+        <div class="hint" id="pp-hint"></div>
+      </div>
+    </div>
+
+    <div class="duo">
+      <div class="col yes"><h4>Nên dùng khi</h4><ul>
+        <li>Tài liệu dày đặc sự thật: bài bách khoa, hồ sơ, tài liệu quy định.</li>
+        <li>Câu hỏi thường nhắm vào một chi tiết cụ thể ("năm nào?", "bao nhiêu ngày?").</li>
+        <li>Cần recall cao trên truy vấn factoid.</li>
+      </ul></div>
+      <div class="col no"><h4>Không nên / lưu ý</h4><ul>
+        <li>Tốn LLM cho <b>mọi</b> đoạn lúc lập chỉ mục — đắt trên kho lớn.</li>
+        <li>Câu hỏi cần ngữ cảnh rộng, tường thuật dài → mệnh đề rời rạc phản tác dụng.</li>
+        <li>Tách sai có thể làm mệnh đề mất chủ ngữ ("Nó có hơn 200 module" — "nó" là ai?). Chất lượng phụ thuộc prompt tách.</li>
+      </ul></div>
+    </div>
+
+    <div class="quiz" data-answer="1">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Đặc điểm QUAN TRỌNG NHẤT khiến một câu trở thành "proposition tốt" là gì?</p>
+      <div class="opts">
+        <button class="opt">Càng ngắn càng tốt</button>
+        <button class="opt">Tự đủ nghĩa — đọc riêng nó vẫn hiểu, không cần câu khác để giải nghĩa đại từ hay ngữ cảnh</button>
+        <button class="opt">Chứa càng nhiều từ khóa càng tốt</button>
+      </div>
+      <div class="expl">Tính <b>tự đủ nghĩa</b> (self-contained) là cốt lõi: "Nó được phát hành năm 2015" là mệnh đề tồi vì "nó" vô nghĩa khi tách khỏi đoạn. "Thư viện X được phát hành năm 2015" mới dùng được. Đây cũng là chỗ khó nhất khi cài đặt — prompt tách phải giải hết đại từ.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CSV/JSON ================= -->
+<section class="tech" id="csv">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 5/5</div>
+      <h2>RAG với CSV / JSON</h2>
+      <div class="badges"><span class="badge lv1">Cấp 1</span><span class="badge stage-idx">Giai đoạn: Lập chỉ mục</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Không phải dữ liệu nào cũng là văn xuôi. Bảng CSV (danh sách sản phẩm, service) và JSON (bản ghi API) có cấu trúc riêng — embed thẳng một dòng số liệu vô nghĩa với model ngữ nghĩa.
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      "Làm phẳng" mỗi bản ghi thành một câu tự nhiên trước khi embed: ghép <i>tên trường + giá trị</i> thành văn bản đọc được. Mỗi dòng/bản ghi trở thành một "chunk", embed như bình thường.
+    </div>
+
+<pre><code><span class="c"># CSV: mỗi dòng → một câu mô tả</span>
+<span class="c"># row = {ten: "api-gateway", ngon_ngu: "Go", so_ban_ghi: 3}</span>
+text = <span class="s">"Service api-gateway viết bằng Go, đã qua 3 lần nâng cấp lớn."</span>
+store.add(embed(text), metadata=row)   <span class="c"># giữ row gốc trong metadata để lọc chính xác</span></code></pre>
+    <p style="font-size:.9rem">Mẹo quan trọng: giữ bản ghi gốc trong <b>metadata</b>. Truy vấn ngữ nghĩa tìm bản ghi liên quan, còn các điều kiện chính xác (số lần nâng cấp &gt; 2, ngôn ngữ = "Go") thì <b>lọc bằng metadata</b> — đây chính là mầm mống của Multi-faceted Filtering ở nhóm sau. Với câu hỏi thuần bảng ("đếm bao nhiêu service viết bằng Go"), RAG không phải công cụ tốt nhất — SQL/text-to-SQL hợp hơn.</p>
+
+    <div class="quiz" data-answer="0">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Câu hỏi "Có bao nhiêu service đã nâng cấp trên 5 lần?" nên xử lý thế nào?</p>
+      <div class="opts">
+        <button class="opt">Dùng lọc metadata / SQL để đếm chính xác — RAG ngữ nghĩa không đảm bảo đếm đủ và đúng</button>
+        <button class="opt">Embed câu hỏi rồi lấy top-k, đếm số kết quả trả về</button>
+        <button class="opt">Tăng k lên thật cao rồi đếm</button>
+      </div>
+      <div class="expl">Vector search trả "gần nhất", không đảm bảo trả <i>hết</i> bản ghi thỏa điều kiện — đếm bằng top-k sẽ sai. Câu hỏi tổng hợp/định lượng trên dữ liệu bảng thuộc về truy vấn có cấu trúc (SQL, lọc metadata), không phải retrieval ngữ nghĩa. Biết ranh giới này giúp không ép RAG làm việc nó dở.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPARE ================= -->
+<section class="tech" id="compare">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Tổng kết nhóm</div>
+      <h2>So sánh & vị trí trong lộ trình</h2>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Kỹ thuật</th><th>Độ phức tạp</th><th>Chi phí</th><th>Vai trò</th><th>Trường hợp phù hợp nhất</th></tr></thead>
+      <tbody>
+        <tr><td><b>Simple RAG</b></td><td>★☆☆</td><td>Thấp</td><td>Bộ khung nền</td><td>Mọi dự án — luôn bắt đầu từ đây rồi mới nâng cấp</td></tr>
+        <tr><td><b>Choose Chunk Size</b></td><td>★☆☆</td><td>Thử nghiệm lúc index</td><td>Tinh chỉnh nền</td><td>Ngay sau khi có Simple RAG chạy được</td></tr>
+        <tr><td><b>Reliable RAG</b></td><td>★★☆</td><td>+1 LLM call/chunk</td><td>Chống hallucination</td><td>Tình huống rủi ro cao: hướng dẫn vận hành, cấu hình production</td></tr>
+        <tr><td><b>Proposition Chunking</b></td><td>★★☆</td><td>LLM cho mọi đoạn (index)</td><td>Đơn vị index tinh</td><td>Kho dày sự thật, câu hỏi factoid</td></tr>
+        <tr><td><b>RAG CSV/JSON</b></td><td>★☆☆</td><td>Thấp</td><td>Mở rộng loại dữ liệu</td><td>Dữ liệu bảng, bản ghi có cấu trúc</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="summary">
+      <h3>Ghi nhớ 5 điều</h3>
+      <ul>
+        <li>Simple RAG = 4 bước Cắt · Nhúng · Tìm · Sinh. Mọi kỹ thuật nâng cao chỉ là "làm tốt hơn" một trong bốn bước — luôn định vị được kỹ thuật mới vào khung này.</li>
+        <li>Ranh giới <b>index-time vs query-time</b> quyết định mỗi kỹ thuật trả chi phí ở đâu (latency hay chi phí lập chỉ mục).</li>
+        <li>Chunk size là siêu tham số hình chuông — không có số vàng, phải đo. Tài liệu có cấu trúc thì cắt theo cấu trúc.</li>
+        <li>Reliable RAG dạy hệ thống nói "không đủ dữ liệu" — an toàn hơn đoán sai, bắt buộc khi câu trả lời sai gây hậu quả thật.</li>
+        <li>Biết khi nào <b>không</b> dùng RAG: câu hỏi định lượng trên bảng thuộc về SQL/lọc, không phải retrieval ngữ nghĩa.</li>
+      </ul>
+    </div>
+
+    <div class="nav-next">
+      <a href="index.html">← Trang tổng quan</a>
+      <a href="01-query-enhancement.html">Ôn lại: Nâng cấp truy vấn →</a>
+    </div>
+    <p style="font-size:.85rem;color:var(--ink-soft)">Batch 2 hoàn tất nhóm Nền tảng. Batch tiếp theo: hoàn thiện nhóm Làm giàu ngữ cảnh (5 kỹ thuật còn lại), giữ nguyên format này.</p>
+  </div>
+</section>
+
+<script>
+/* progress */
+addEventListener('scroll',()=>{
+  const h=document.documentElement;
+  document.getElementById('progress').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';
+},{passive:true});
+
+/* ---------- Simple RAG stepper ---------- */
+const srCaps=[
+ 'Nhấn "Bước tiếp" để bắt đầu. Ba bước đầu (①②) làm <b>trước</b>, một lần khi nạp dữ liệu; hai bước sau (③④) chạy <b>mỗi lần</b> có câu hỏi.',
+ '① <b>Cắt:</b> Tài liệu SDK được cắt thành nhiều chunk ~500 ký tự. Một trong số đó chứa đoạn về cơ chế retry.',
+ '② <b>Nhúng:</b> Mỗi chunk biến thành một vector và lưu vào cơ sở dữ liệu vector. Xong bước này, kho đã "sẵn sàng để hỏi".',
+ '③ <b>Tìm:</b> Câu hỏi "SDK có hỗ trợ retry tự động không?" được nhúng, hệ thống lấy 4 chunk có vector gần nhất — trúng đoạn nói về cơ chế retry.',
+ '④ <b>Sinh:</b> 4 chunk + câu hỏi ghép vào prompt. LLM trả lời: <i>"Có. SDK retry tối đa 3 lần với exponential backoff, bật qua tùy chọn <code>retry.enabled</code> (mục 4.2)."</i> — dựa trên nguồn thật, kèm trích dẫn. ✔'
+];
+let srStep=0;
+const srBtns=['Bước 1: Cắt tài liệu ▸','Bước 2: Nhúng vào DB ▸','Bước 3: Tìm chunk gần ▸','Bước 4: Sinh câu trả lời ▸','Hoàn tất — nhấn ↺'];
+function srApply(){
+  for(let i=1;i<=4;i++)document.getElementById('srs'+i).classList.toggle('active',i<=srStep);
+  document.getElementById('sr-cap').innerHTML=srCaps[srStep];
+  const b=document.getElementById('sr-next');
+  b.textContent=srBtns[Math.min(srStep,4)];
+  b.disabled=srStep>=4;
+}
+document.getElementById('sr-next').addEventListener('click',()=>{srStep=Math.min(srStep+1,4);srApply();});
+document.getElementById('sr-reset').addEventListener('click',()=>{srStep=0;document.getElementById('sr-next').disabled=false;srApply();});
+srApply();
+
+/* ---------- Chunk size tradeoff ---------- */
+const csS=document.getElementById('cs-size');
+function csRender(){
+  const s=+csS.value;
+  document.getElementById('cs-size-val').textContent=s;
+  // precision: high when small, decays as size grows
+  const prec=Math.max(4, 100 - (s-80)/1120*80);            // 100 -> ~20
+  // context: low when small, rises then saturates
+  const ctx=Math.min(100, 15 + (s-80)/1120*100);           // 15 -> ~115 capped
+  // total quality: bell-shaped, peak around 350-450
+  const peak=400, spread=340;
+  const tot=Math.round(96*Math.exp(-Math.pow(s-peak,2)/(2*spread*spread)));
+  const P=Math.round(prec), C=Math.round(Math.min(100,ctx));
+  document.getElementById('cs-prec').style.width=P+'%';
+  document.getElementById('cs-ctx').style.width=C+'%';
+  document.getElementById('cs-tot').style.width=tot+'%';
+  document.getElementById('cs-prec-v').textContent=P;
+  document.getElementById('cs-ctx-v').textContent=C;
+  document.getElementById('cs-tot-v').textContent=tot;
+  let note;
+  if(s<180)note='Chunk quá nhỏ: khớp cực chính xác nhưng mỗi mảnh thiếu ngữ cảnh — LLM nhận mẩu vụn.';
+  else if(s>760)note='Chunk quá lớn: giàu ngữ cảnh nhưng embedding pha loãng nhiều ý, khớp mờ và tốn token.';
+  else note='Vùng cân bằng: chất lượng tổng gần đỉnh. Đây là khoảng nên bắt đầu thử nghiệm và tinh chỉnh bằng eval.';
+  document.getElementById('cs-hint').textContent=note;
+}
+csS.addEventListener('input',csRender); csRender();
+
+/* ---------- Reliable RAG grader ---------- */
+const RLDOCS=[
+ {t:'Mục 4.2 — Cơ chế retry: số lần thử lại và exponential backoff',rel:true},
+ {t:'Mục 4.3 — Cấu hình retry: retry.enabled, retry.maxAttempts',rel:true},
+ {t:'Mục 6.1 — Cơ chế reconnect của WebSocket (khác "retry" HTTP)',rel:false},
+ {t:'Mục 8.4 — Retry policy... trong công cụ CI nội bộ, không thuộc SDK',rel:false}
+];
+let rlGrade=false;
+function rlRender(){
+  const ul=document.getElementById('rl-docs'); ul.innerHTML='';
+  RLDOCS.forEach(d=>{
+    const li=document.createElement('li');
+    const dropped=rlGrade && !d.rel;
+    li.className=rlGrade?(d.rel?'kept':'dropped'):'';
+    li.innerHTML='<span>'+d.t+'</span><span class="verdict">'+(rlGrade?(d.rel?'✔ giữ':'✗ loại'):'top-k')+'</span>';
+    ul.appendChild(li);
+  });
+  const box=document.getElementById('rl-answer');
+  if(!rlGrade){
+    box.className='answer-box bad';
+    box.innerHTML='<b>Câu trả lời (không grader)</b>LLM nhận cả 4 chunk, bao gồm 2 chunk lạc đề ("reconnect WebSocket", "retry policy của CI"). Nó cố gộp tất cả → câu trả lời trộn lẫn thông tin sai, nghe hợp lý nhưng lẫn chi tiết không liên quan. ⚠ Nguy cơ hallucination.';
+  }else{
+    box.className='answer-box good';
+    box.innerHTML='<b>Câu trả lời (có grader)</b>Grader loại 2 chunk lạc đề, chỉ giữ Mục 4.2 &amp; 4.3. LLM trả lời gọn, đúng: <i>"SDK retry tối đa 3 lần với exponential backoff (Mục 4.2)."</i> ✔ Nếu cả 4 chunk đều bị loại, hệ thống sẽ nói "không đủ dữ liệu" thay vì bịa.';
+  }
+}
+document.querySelectorAll('#rl-demo .mode').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#rl-demo .mode').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); rlGrade=b.dataset.grade==='on'; rlRender();
+}));
+rlRender();
+
+/* ---------- Proposition chunking ---------- */
+const PROPS=[
+ 'Thư viện được phát hành lần đầu năm 2015.',
+ 'Thư viện hiện hỗ trợ ba ngôn ngữ.',
+ 'Thư viện có hơn 200 module.',
+ 'Timeout mặc định của HttpClient là 30 giây, chưa tính thời gian retry.'
+];
+let ppSplit=false;
+document.getElementById('pp-split').addEventListener('click',()=>{
+  if(ppSplit)return; ppSplit=true;
+  const ul=document.getElementById('pp-out'); ul.innerHTML='';
+  PROPS.forEach((p,i)=>{
+    const li=document.createElement('li'); li.dataset.i=i;
+    li.innerHTML='<span class="n">P'+(i+1)+'</span><span>'+p+'</span>';
+    ul.appendChild(li);
+  });
+  document.getElementById('pp-query-wrap').style.display='block';
+  document.getElementById('pp-split').disabled=true;
+});
+document.getElementById('pp-reset').addEventListener('click',()=>{
+  ppSplit=false; document.getElementById('pp-out').innerHTML='';
+  document.getElementById('pp-query-wrap').style.display='none';
+  document.getElementById('pp-split').disabled=false;
+  document.querySelectorAll('#pp-demo .mode').forEach(x=>x.classList.remove('on'));
+});
+document.querySelectorAll('#pp-demo [data-t]').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#pp-demo [data-t]').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  const items=[...document.querySelectorAll('#pp-out li')];
+  items.forEach(x=>x.classList.remove('match'));
+  if(b.dataset.t==='prop'){
+    const m=items.find(x=>+x.dataset.i===3); if(m)m.classList.add('match');
+    document.getElementById('pp-hint').innerHTML='Trên <b>mệnh đề</b>: truy vấn khớp thẳng vào P4 — vector của P4 chỉ nói về timeout, không lẫn thông tin phát hành/module → điểm khớp cao, sắc nét.';
+  }else{
+    document.getElementById('pp-hint').innerHTML='Trên <b>đoạn thô</b>: câu hỏi phải khớp với một vector chứa lẫn năm phát hành, số ngôn ngữ, số module <i>và</i> timeout — ý "timeout" bị pha loãng, điểm khớp thấp hơn, dễ bị chunk khác vượt mặt.';
+  }
+}));
+
+/* quizzes */
+document.querySelectorAll('.quiz').forEach(q=>{
+  const ans=+q.dataset.answer, opts=[...q.querySelectorAll('.opt')], expl=q.querySelector('.expl');
+  opts.forEach((o,i)=>o.addEventListener('click',()=>{
+    opts.forEach((x,j)=>{x.classList.remove('right','wrong'); if(j===ans)x.classList.add('right');});
+    if(i!==ans)o.classList.add('wrong');
+    expl.classList.add('show');
+  }));
+});
+</script>
+</body>
+</html>

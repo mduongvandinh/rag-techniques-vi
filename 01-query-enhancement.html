@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nâng cấp truy vấn: Query Transformations & HyDE — Sổ tay RAG</title>
+<style>
+:root{
+  --bg:#F7F8FC; --surface:#FFFFFF; --ink:#16213A; --ink-soft:#4A5570;
+  --line:#DDE2EF; --primary:#3B4CC0; --primary-soft:#E8EBFA;
+  --amber:#B97C1D; --amber-soft:#FBF3E2; --teal:#1F8A70; --teal-soft:#E3F4EF;
+  --rose:#B0455A; --rose-soft:#F9E9ED;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,monospace;
+  --sans:"Be Vietnam Pro","Segoe UI",system-ui,-apple-system,Roboto,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);line-height:1.7;font-size:16.5px}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px}
+a{color:var(--primary)}
+#progress{position:fixed;top:0;left:0;height:3px;background:var(--primary);width:0;z-index:99}
+
+header{background:var(--ink);color:#EDF0FA;padding:44px 0 34px}
+.crumb{font-family:var(--mono);font-size:.78rem;color:#9FB0E8}
+.crumb a{color:#9FB0E8;text-decoration:none}
+.crumb a:hover{text-decoration:underline}
+header h1{font-size:clamp(1.7rem,4vw,2.4rem);font-weight:800;margin:.5rem 0;letter-spacing:-.02em;line-height:1.2}
+header p{color:#C3CCE8;max-width:640px}
+
+.rail-panel{background:#101830;padding:14px 0 20px}
+.rail-panel svg{display:block;margin:0 auto}
+
+nav.toc{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin:26px auto;max-width:860px}
+nav.toc b{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft)}
+nav.toc ol{margin:8px 0 0 20px}
+nav.toc li{padding:2px 0}
+
+section.tech{padding:36px 0 10px}
+.tech-head{border-left:5px solid var(--primary);padding-left:16px;margin-bottom:20px}
+.tech-head .kicker{font-family:var(--mono);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--primary)}
+.tech-head h2{font-size:1.7rem;font-weight:800;letter-spacing:-.01em}
+.badges{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.badge{font-family:var(--mono);font-size:.68rem;padding:2px 9px;border-radius:99px}
+.lv1{background:var(--teal-soft);color:var(--teal)} .lv2{background:var(--amber-soft);color:var(--amber)}
+.stage{background:var(--primary-soft);color:var(--primary)}
+
+h3{font-size:1.12rem;font-weight:700;margin:28px 0 8px}
+p{margin-bottom:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0;overflow-x:auto}
+.problem{border-left:4px solid var(--rose);background:var(--rose-soft)}
+.insight{border-left:4px solid var(--teal);background:var(--teal-soft)}
+.problem b,.insight b{display:block;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.problem b{color:var(--rose)} .insight b{color:var(--teal)}
+
+pre{background:#101830;color:#D9E0F5;font-family:var(--mono);font-size:.82rem;line-height:1.6;padding:16px 18px;border-radius:12px;overflow-x:auto;margin:14px 0}
+pre .c{color:#7A88B8} pre .k{color:#FFC96B} pre .s{color:#8FD3B6}
+code{font-family:var(--mono);font-size:.85em;background:var(--primary-soft);color:var(--primary);padding:1px 6px;border-radius:5px}
+pre code{background:none;color:inherit;padding:0}
+
+/* demo widgets */
+.demo{background:var(--surface);border:2px solid var(--primary);border-radius:14px;padding:20px;margin:18px 0}
+.demo .demo-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.demo .demo-tag::before{content:"▶";font-size:.6rem}
+.controls{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+select,button{font-family:var(--sans);font-size:.9rem;padding:8px 14px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+button.primary{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+button.primary:hover{background:#2E3CA0}
+button.mode{border:1.5px solid var(--line)}
+button.mode.on{border-color:var(--primary);background:var(--primary-soft);color:var(--primary);font-weight:600}
+button:focus-visible,select:focus-visible{outline:3px solid #9FB0E8;outline-offset:1px}
+.qbox{font-family:var(--mono);font-size:.85rem;background:var(--bg);border:1px dashed var(--ink-soft);border-radius:9px;padding:10px 12px;margin:8px 0}
+.out-list{list-style:none;margin-top:10px}
+.out-list li{border:1px solid var(--line);border-radius:9px;padding:9px 12px;margin-bottom:8px;font-size:.9rem;background:var(--bg);transition:all .25s}
+.out-list li.hit{border-color:var(--teal);background:var(--teal-soft)}
+.out-list li.miss{opacity:.55}
+.out-list .score{font-family:var(--mono);font-size:.74rem;color:var(--ink-soft);float:right}
+.hint{font-size:.84rem;color:var(--ink-soft);margin-top:8px}
+
+/* pros/cons */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}
+.duo .col{border-radius:12px;padding:16px 18px}
+.duo .yes{background:var(--teal-soft);border:1px solid #BADFD2}
+.duo .no{background:var(--rose-soft);border:1px solid #EBC6CE}
+.duo h4{font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.duo .yes h4{color:var(--teal)} .duo .no h4{color:var(--rose)}
+.duo ul{margin-left:18px;font-size:.9rem}
+.duo li{margin-bottom:6px}
+@media (max-width:620px){.duo{grid-template-columns:1fr}}
+
+/* quiz */
+.quiz{background:var(--amber-soft);border:1px solid #EAD9B4;border-radius:14px;padding:20px;margin:20px 0}
+.quiz .q-tag{font-family:var(--mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:8px}
+.quiz p.q{font-weight:600;margin-bottom:10px}
+.quiz .opts{display:flex;flex-direction:column;gap:8px}
+.quiz .opt{text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:9px;padding:9px 13px;font-size:.92rem}
+.quiz .opt:hover{border-color:var(--amber)}
+.quiz .opt.right{border-color:var(--teal);background:var(--teal-soft)}
+.quiz .opt.wrong{border-color:var(--rose);background:var(--rose-soft)}
+.quiz .expl{display:none;margin-top:10px;font-size:.88rem;background:#fff;border-radius:9px;padding:10px 13px}
+.quiz .expl.show{display:block}
+
+table{width:100%;border-collapse:collapse;background:var(--surface);font-size:.88rem}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--ink);color:#EDF0FA;font-size:.76rem;text-transform:uppercase;letter-spacing:.05em}
+.table-scroll{overflow-x:auto;border-radius:12px;border:1px solid var(--line);margin:14px 0}
+
+.summary{background:var(--ink);color:#D9E0F5;border-radius:14px;padding:24px;margin:30px 0}
+.summary h3{color:#FFC96B;margin-top:0}
+.summary ul{margin-left:20px}
+.summary li{margin-bottom:8px}
+.nav-next{display:flex;justify-content:space-between;gap:12px;padding:10px 0 50px;flex-wrap:wrap}
+.nav-next a{text-decoration:none;font-weight:600;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 18px}
+.nav-next a:hover{border-color:var(--primary)}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<header>
+  <div class="wrap">
+    <div class="crumb"><a href="index.html">← Trang tổng quan</a> · Nhóm 1/8</div>
+    <h1>Nâng cấp truy vấn — sửa câu hỏi trước khi đi tìm</h1>
+    <p>Truy xuất kém thường không phải do kho dữ liệu kém, mà do <b>câu hỏi thô của người dùng không phải là truy vấn tốt</b>. Nhóm kỹ thuật này can thiệp ở giai đoạn 2 của pipeline: biến đổi truy vấn trước khi chạm vào vector store.</p>
+  </div>
+</header>
+
+<!-- pipeline rail: signature element -->
+<div class="rail-panel">
+  <svg viewBox="0 0 760 56" width="100%" style="max-width:820px" role="img" aria-label="Vị trí trong pipeline: giai đoạn Truy vấn">
+    <line x1="20" y1="28" x2="740" y2="28" stroke="#2A3560" stroke-width="2"/>
+    <g font-size="11" text-anchor="middle" font-family="inherit">
+      <circle cx="80" cy="28" r="7" fill="#2A3560"/><text x="80" y="52" fill="#6C7BB0">Lập chỉ mục</text>
+      <circle cx="240" cy="28" r="11" fill="#FFC96B"/><text x="240" y="52" fill="#FFC96B" font-weight="700">Truy vấn ◀ bạn ở đây</text>
+      <circle cx="400" cy="28" r="7" fill="#2A3560"/><text x="400" y="52" fill="#6C7BB0">Truy xuất</text>
+      <circle cx="560" cy="28" r="7" fill="#2A3560"/><text x="560" y="52" fill="#6C7BB0">Hậu xử lý</text>
+      <circle cx="700" cy="28" r="7" fill="#2A3560"/><text x="700" y="52" fill="#6C7BB0">Sinh</text>
+    </g>
+  </svg>
+</div>
+
+<nav class="toc wrap">
+  <b>Trong bài này</b>
+  <ol>
+    <li><a href="#qt">Query Transformations</a> — Rewrite · Step-back · Decompose</li>
+    <li><a href="#hyde">HyDE</a> — Hypothetical Document Embedding (+ so sánh HyPE)</li>
+    <li><a href="#compare">Bảng so sánh & cách chọn</a></li>
+  </ol>
+</nav>
+
+<!-- ================= QUERY TRANSFORMATIONS ================= -->
+<section class="tech" id="qt">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 1/2</div>
+      <h2>Query Transformations</h2>
+      <div class="badges"><span class="badge lv1">Cấp 1 · Nền tảng</span><span class="badge stage">Giai đoạn: Truy vấn</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Người dùng viết truy vấn cho <i>con người</i> đọc, không phải cho <i>máy tìm kiếm ngữ nghĩa</i>: mơ hồ ("cái đó xử lý sao?"), quá rộng, hoặc gộp 3 câu hỏi vào 1. Embedding của một truy vấn tồi trỏ vào vùng sai của không gian vector → truy xuất sai từ bước đầu, mọi kỹ thuật phía sau không cứu được.
+    </div>
+
+    <h3>Cơ chế: ba phép biến đổi</h3>
+    <p>Dùng chính LLM làm "biên tập viên truy vấn" trước khi tìm kiếm. Repo gốc cài đặt 3 chiến lược, mỗi chiến lược trị một loại bệnh khác nhau:</p>
+
+    <div class="panel">
+      <svg viewBox="0 0 800 300" width="100%" style="min-width:640px" role="img" aria-label="Ba nhánh biến đổi truy vấn">
+        <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4A5570"/></marker></defs>
+        <rect x="20" y="120" width="150" height="58" rx="10" fill="#F9E9ED" stroke="#B0455A"/>
+        <text x="95" y="145" text-anchor="middle" font-size="13" font-weight="700" fill="#16213A">Truy vấn thô</text>
+        <text x="95" y="163" text-anchor="middle" font-size="11" fill="#4A5570">của người dùng</text>
+
+        <rect x="250" y="120" width="120" height="58" rx="10" fill="#E8EBFA" stroke="#3B4CC0"/>
+        <text x="310" y="145" text-anchor="middle" font-size="13" font-weight="700" fill="#3B4CC0">LLM</text>
+        <text x="310" y="163" text-anchor="middle" font-size="11" fill="#4A5570">biên tập viên</text>
+        <line x1="170" y1="149" x2="246" y2="149" stroke="#4A5570" stroke-width="1.6" marker-end="url(#a2)"/>
+
+        <g font-size="12.5" font-weight="700" fill="#16213A">
+          <rect x="470" y="28" width="300" height="66" rx="10" fill="#fff" stroke="#1F8A70" stroke-width="1.5"/>
+          <text x="486" y="52">① Rewrite — viết lại cho rõ</text>
+          <text x="486" y="72" font-weight="400" font-size="11.5" fill="#4A5570">Cụ thể hóa, thêm từ khóa, sửa mơ hồ.</text>
+          <text x="486" y="86" font-weight="400" font-size="11.5" fill="#4A5570">Trị: truy vấn cẩu thả, thiếu ngữ cảnh.</text>
+
+          <rect x="470" y="116" width="300" height="66" rx="10" fill="#fff" stroke="#B97C1D" stroke-width="1.5"/>
+          <text x="486" y="140">② Step-back — lùi một bước</text>
+          <text x="486" y="160" font-weight="400" font-size="11.5" fill="#4A5570">Sinh câu hỏi tổng quát hơn để lấy nền tảng.</text>
+          <text x="486" y="174" font-weight="400" font-size="11.5" fill="#4A5570">Trị: câu hỏi quá chi tiết, kho không có khớp trực tiếp.</text>
+
+          <rect x="470" y="204" width="300" height="66" rx="10" fill="#fff" stroke="#3B4CC0" stroke-width="1.5"/>
+          <text x="486" y="228">③ Decompose — tách nhỏ</text>
+          <text x="486" y="248" font-weight="400" font-size="11.5" fill="#4A5570">Chia câu hỏi phức thành 2–4 câu hỏi con,</text>
+          <text x="486" y="262" font-weight="400" font-size="11.5" fill="#4A5570">tìm riêng từng câu rồi gộp. Trị: câu hỏi đa ý.</text>
+        </g>
+        <g stroke="#4A5570" stroke-width="1.4">
+          <path d="M370 135 C 415 110, 430 70, 466 61" fill="none" marker-end="url(#a2)"/>
+          <line x1="370" y1="149" x2="466" y2="149" marker-end="url(#a2)"/>
+          <path d="M370 163 C 415 190, 430 228, 466 237" fill="none" marker-end="url(#a2)"/>
+        </g>
+      </svg>
+    </div>
+
+    <div class="demo" id="qt-demo">
+      <div class="demo-tag">Demo mô phỏng — xem truy vấn biến đổi thay đổi kết quả truy xuất</div>
+      <p style="font-size:.9rem">Chọn một truy vấn mẫu và một chiến lược. Danh sách bên dưới mô phỏng 5 tài liệu trong kho: tài liệu <span style="color:var(--teal);font-weight:700">xanh</span> là được truy xuất trúng, tài liệu mờ là bị bỏ qua.</p>
+      <div class="controls">
+        <select id="qt-query" aria-label="Chọn truy vấn mẫu">
+          <option value="q1">"cái app bị lỗi thì sao ạ?" (mơ hồ)</option>
+          <option value="q2">"Timeout mặc định của HttpClient bản 4.2.1 trên Windows là bao nhiêu ms?" (quá chi tiết)</option>
+          <option value="q3">"So sánh cache Redis và Memcached, và cách cấu hình từng loại?" (đa ý)</option>
+        </select>
+      </div>
+      <div class="controls" role="group" aria-label="Chọn chiến lược">
+        <button class="mode on" data-mode="none">Không biến đổi</button>
+        <button class="mode" data-mode="rewrite">① Rewrite</button>
+        <button class="mode" data-mode="stepback">② Step-back</button>
+        <button class="mode" data-mode="decompose">③ Decompose</button>
+      </div>
+      <div><b style="font-size:.82rem;color:var(--ink-soft)">TRUY VẤN GỬI ĐI:</b><div class="qbox" id="qt-transformed"></div></div>
+      <ul class="out-list" id="qt-results"></ul>
+      <div class="hint" id="qt-hint"></div>
+    </div>
+
+    <h3>Pseudocode tối giản</h3>
+<pre><code><span class="c"># Ba chiến lược đều là "LLM call trước khi search"</span>
+<span class="k">def</span> transform(query, mode):
+    <span class="k">if</span> mode == <span class="s">"rewrite"</span>:
+        <span class="k">return</span> [llm(<span class="s">"Viết lại truy vấn cho cụ thể, đủ ngữ cảnh: "</span> + query)]
+    <span class="k">if</span> mode == <span class="s">"stepback"</span>:
+        <span class="k">return</span> [query, llm(<span class="s">"Sinh câu hỏi tổng quát hơn đứng sau: "</span> + query)]
+    <span class="k">if</span> mode == <span class="s">"decompose"</span>:
+        <span class="k">return</span> llm(<span class="s">"Tách thành 2-4 câu hỏi con độc lập: "</span> + query)  <span class="c"># list</span>
+
+docs = unique(flatten([vector_search(q, k=5) <span class="k">for</span> q <span class="k">in</span> transform(query, mode)]))</code></pre>
+
+    <div class="duo">
+      <div class="col yes"><h4>Nên dùng khi</h4><ul>
+        <li>Truy vấn đến từ người dùng cuối không chuyên (chatbot công khai).</li>
+        <li>Log cho thấy nhiều truy vấn mơ hồ / đa ý.</li>
+        <li>Đây là kỹ thuật <b>rẻ nhất</b> để thử đầu tiên: 1 LLM call nhỏ.</li>
+      </ul></div>
+      <div class="col no"><h4>Không nên khi</h4><ul>
+        <li>Truy vấn đã có cấu trúc tốt (sinh bởi hệ thống, không phải người).</li>
+        <li>Latency cực nhạy: mỗi biến đổi cộng thêm một vòng LLM.</li>
+        <li>Decompose với câu hỏi vốn đơn giản → tốn kém vô ích, thêm nhiễu.</li>
+      </ul></div>
+    </div>
+
+    <div class="quiz" data-answer="1">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Kho tài liệu của bạn chỉ chứa các bài tổng quan, nhưng người dùng hỏi rất chi tiết ("thông số X của model Y bản 2023"). Chiến lược nào phù hợp nhất?</p>
+      <div class="opts">
+        <button class="opt">Rewrite — viết lại cho chi tiết hơn nữa</button>
+        <button class="opt">Step-back — sinh câu hỏi tổng quát để khớp với tài liệu tổng quan</button>
+        <button class="opt">Decompose — tách thành nhiều câu chi tiết hơn</button>
+      </div>
+      <div class="expl">Đúng: <b>Step-back</b>. Kho không có tài liệu khớp mức chi tiết đó — lùi về câu hỏi tổng quát ("thông số kỹ thuật dòng model Y") mới trúng vùng kho thực sự có. Rewrite/Decompose càng chi tiết càng trượt.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= HYDE ================= -->
+<section class="tech" id="hyde">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Kỹ thuật 2/2</div>
+      <h2>HyDE — Hypothetical Document Embedding</h2>
+      <div class="badges"><span class="badge lv2">Cấp 2 · Trung cấp</span><span class="badge stage">Giai đoạn: Truy vấn</span></div>
+    </div>
+
+    <div class="panel problem">
+      <b>Vấn đề nó giải quyết</b>
+      Vector search so khớp <i>câu hỏi</i> với <i>câu trả lời</i> — nhưng hai thứ này có hình dạng ngôn ngữ rất khác nhau. "Vì sao trời xanh?" (ngắn, dạng nghi vấn) và đoạn văn giải thích tán xạ Rayleigh (dài, dạng trần thuật) nằm khá xa nhau trong không gian embedding, dù về nội dung là một cặp hoàn hảo. Đây là <b>khoảng cách câu hỏi–tài liệu</b> (query–document gap).
+    </div>
+
+    <div class="panel insight">
+      <b>Ý tưởng lõi</b>
+      Đừng tìm bằng câu hỏi — hãy <b>bịa ra một câu trả lời giả định</b> (hypothetical document) rồi tìm bằng nó. Tài liệu giả có thể sai chi tiết, nhưng <i>hình dạng ngôn ngữ và từ vựng</i> của nó giống tài liệu thật → embedding của nó rơi đúng vào cụm tài liệu thật. So khớp tài-liệu-với-tài-liệu dễ hơn câu-hỏi-với-tài-liệu.
+    </div>
+
+    <h3>Cơ chế qua không gian embedding</h3>
+    <div class="demo" id="hyde-demo">
+      <div class="demo-tag">Demo mô phỏng — không gian embedding 2D</div>
+      <p style="font-size:.9rem">Nhấn từng bước để xem điểm truy vấn "di chuyển" vào cụm tài liệu đúng. Vòng tròn nét đứt là bán kính top-k của vector search.</p>
+      <div class="controls">
+        <button class="primary" id="hyde-step-btn">Bước 1: Embed truy vấn thô</button>
+        <button id="hyde-reset">↺ Làm lại</button>
+      </div>
+      <svg id="hyde-svg" viewBox="0 0 760 340" width="100%" style="min-width:600px" role="img" aria-label="Mô phỏng không gian embedding của HyDE">
+        <!-- doc cluster (answers) -->
+        <g id="hyde-docs">
+          <circle cx="560" cy="120" r="8" fill="#1F8A70"/><text x="574" y="124" font-size="11" fill="#4A5570">Tài liệu A (đúng)</text>
+          <circle cx="600" cy="170" r="8" fill="#1F8A70"/><text x="614" y="174" font-size="11" fill="#4A5570">Tài liệu B (đúng)</text>
+          <circle cx="540" cy="190" r="8" fill="#1F8A70"/><text x="466" y="212" font-size="11" fill="#4A5570">Tài liệu C (đúng)</text>
+          <circle cx="300" cy="270" r="8" fill="#9AA5C5"/><text x="314" y="274" font-size="11" fill="#4A5570">Tài liệu lạc đề</text>
+          <circle cx="200" cy="230" r="8" fill="#9AA5C5"/><text x="214" y="234" font-size="11" fill="#4A5570">Tài liệu lạc đề</text>
+        </g>
+        <!-- query point -->
+        <circle id="hyde-q" cx="140" cy="90" r="10" fill="#B0455A" style="transition:cx 1s ease, cy 1s ease"/>
+        <text id="hyde-qlabel" x="60" y="66" font-size="12" font-weight="700" fill="#B0455A">Truy vấn thô ●</text>
+        <!-- retrieval radius -->
+        <circle id="hyde-radius" cx="140" cy="90" r="95" fill="none" stroke="#B0455A" stroke-dasharray="6 5" stroke-width="1.6" style="transition:cx 1s ease, cy 1s ease, stroke .5s"/>
+        <!-- hypothetical doc ghost -->
+        <g id="hyde-ghost" opacity="0" style="transition:opacity .6s">
+          <circle cx="565" cy="155" r="10" fill="none" stroke="#B97C1D" stroke-width="2.5" stroke-dasharray="4 3"/>
+          <text x="580" y="143" font-size="12" font-weight="700" fill="#B97C1D">Tài liệu giả định ◌</text>
+        </g>
+        <text id="hyde-caption" x="20" y="326" font-size="13" fill="#16213A" font-weight="600">Trạng thái: chưa bắt đầu.</text>
+      </svg>
+      <div class="hint" id="hyde-hint">Điểm đỏ = vị trí embedding dùng để tìm kiếm. Mục tiêu: đưa nó vào giữa cụm xanh.</div>
+    </div>
+
+    <h3>Pseudocode tối giản</h3>
+<pre><code><span class="c"># HyDE = một prompt + một lần embed, không đổi gì ở vector store</span>
+hypothetical_doc = llm(
+    <span class="s">"Viết một đoạn văn trả lời câu hỏi sau, như trích từ tài liệu chuyên môn.\n"</span>
+    <span class="s">"Câu hỏi: "</span> + query
+)
+vec  = embed(hypothetical_doc)      <span class="c"># ⚠ embed tài liệu giả, KHÔNG embed câu hỏi</span>
+docs = vector_store.search(vec, k=5)
+answer = llm(context=docs, question=query)  <span class="c"># trả lời vẫn dựa trên tài liệu THẬT</span></code></pre>
+    <p>Chi tiết dễ hiểu lầm nhất: tài liệu giả <b>chỉ dùng để tìm</b>, tuyệt đối không đưa vào ngữ cảnh sinh câu trả lời. Nếu nó bịa sai cũng không sao — miễn là nó "nghe giống" tài liệu đúng.</p>
+
+    <h3>HyDE vs HyPE — cùng ý tưởng, khác vị trí trả chi phí</h3>
+    <div class="table-scroll"><table>
+      <thead><tr><th></th><th>HyDE</th><th>HyPE</th></tr></thead>
+      <tbody>
+        <tr><td><b>LLM call lúc nào</b></td><td>Mỗi lần người dùng hỏi (query time)</td><td>Một lần lúc lập chỉ mục (index time)</td></tr>
+        <tr><td><b>Sinh ra gì</b></td><td>Tài liệu giả từ câu hỏi</td><td>Nhiều câu hỏi giả từ mỗi chunk</td></tr>
+        <tr><td><b>Bài toán khớp trở thành</b></td><td>tài liệu ↔ tài liệu</td><td>câu hỏi ↔ câu hỏi</td></tr>
+        <tr><td><b>Latency khi hỏi</b></td><td>+1 vòng LLM</td><td>+0 (nhanh như RAG thường)</td></tr>
+        <tr><td><b>Chi phí lập chỉ mục</b></td><td>Không đổi</td><td>Tăng đáng kể (LLM cho mọi chunk)</td></tr>
+        <tr><td><b>Hợp với</b></td><td>Kho thay đổi thường xuyên, traffic thấp</td><td>Kho ổn định, traffic cao, cần latency thấp</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="duo">
+      <div class="col yes"><h4>Nên dùng khi</h4><ul>
+        <li>Câu hỏi ngắn nhưng tài liệu trả lời dài, khác văn phong.</li>
+        <li>Miền chuyên sâu: LLM viết "nghe giống" thuật ngữ trong kho.</li>
+        <li>Đo được recall@k thấp dù kho chắc chắn có tài liệu đúng.</li>
+      </ul></div>
+      <div class="col no"><h4>Không nên khi</h4><ul>
+        <li>Truy vấn chứa mã định danh chính xác (mã lỗi, số phiên bản) — tài liệu giả có thể bịa sai mã, kéo tìm kiếm lệch hướng (dùng Fusion Retrieval thay thế).</li>
+        <li>Miền quá mới/hẹp mà LLM không biết viết tài liệu giả hợp lý.</li>
+        <li>Latency nhạy và kho ổn định → cân nhắc HyPE.</li>
+      </ul></div>
+    </div>
+
+    <div class="quiz" data-answer="2">
+      <div class="q-tag">Kiểm tra nhanh</div>
+      <p class="q">Tài liệu giả định do LLM sinh ra trong HyDE có nội dung sai lệch về chi tiết. Hệ quả là gì?</p>
+      <div class="opts">
+        <button class="opt">Câu trả lời cuối sẽ sai theo, vì tài liệu giả nằm trong ngữ cảnh</button>
+        <button class="opt">HyDE thất bại hoàn toàn, phải fallback về tìm bằng câu hỏi gốc</button>
+        <button class="opt">Thường vẫn ổn — tài liệu giả chỉ dùng làm "mồi" tìm kiếm, câu trả lời sinh từ tài liệu thật truy xuất được</button>
+      </div>
+      <div class="expl">Đúng: tài liệu giả không bao giờ vào ngữ cảnh sinh. Nó chỉ cần <i>giống về hình dạng ngôn ngữ</i> với tài liệu đúng để embedding rơi gần cụm đúng. Ngoại lệ đáng lo duy nhất: khi nó bịa sai <i>từ khóa định danh</i> làm lệch hẳn hướng tìm.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPARISON ================= -->
+<section class="tech" id="compare">
+  <div class="wrap">
+    <div class="tech-head">
+      <div class="kicker">Tổng kết nhóm</div>
+      <h2>So sánh & cách chọn trong nhóm Query Enhancement</h2>
+    </div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>Kỹ thuật</th><th>Độ phức tạp</th><th>Chi phí (latency + token)</th><th>Cải thiện kỳ vọng</th><th>Trường hợp phù hợp nhất</th></tr></thead>
+      <tbody>
+        <tr><td><b>Rewrite</b></td><td>★☆☆</td><td>+1 LLM call nhỏ</td><td>Vừa — với truy vấn cẩu thả</td><td>Chatbot người dùng cuối, truy vấn hội thoại</td></tr>
+        <tr><td><b>Step-back</b></td><td>★☆☆</td><td>+1 LLM call, tìm 2 lần</td><td>Cao — khi kho tổng quan hơn câu hỏi</td><td>Câu hỏi chi tiết trên kho kiến thức nền</td></tr>
+        <tr><td><b>Decompose</b></td><td>★★☆</td><td>+1 LLM call, tìm n lần</td><td>Cao — với câu hỏi đa ý</td><td>Câu hỏi so sánh, nhiều điều kiện</td></tr>
+        <tr><td><b>HyDE</b></td><td>★★☆</td><td>+1 LLM call dài hơn</td><td>Cao — khi có query–document gap</td><td>Câu hỏi ngắn ↔ tài liệu dài, khác văn phong</td></tr>
+        <tr><td><b>HyPE</b></td><td>★★★ (index)</td><td>+0 lúc hỏi / cao lúc index</td><td>Tương đương HyDE, precision có thể cao hơn</td><td>Kho ổn định, traffic lớn, cần latency thấp</td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="summary">
+      <h3>Ghi nhớ 4 điều</h3>
+      <ul>
+        <li>Nhóm này sửa <b>đầu vào</b> của truy xuất — luôn rẻ hơn sửa index, nên thử trước tiên khi recall kém.</li>
+        <li>Chẩn đoán trước khi chọn: mơ hồ → Rewrite; quá chi tiết so với kho → Step-back; đa ý → Decompose; khác hình dạng ngôn ngữ → HyDE.</li>
+        <li>HyDE embed <b>tài liệu giả</b>, không phải câu hỏi; và tài liệu giả không bao giờ vào ngữ cảnh trả lời.</li>
+        <li>Mọi kỹ thuật ở đây đổi <b>latency</b> lấy <b>recall</b> — chỉ giữ lại kỹ thuật nào chứng minh được lợi ích qua bộ eval.</li>
+      </ul>
+    </div>
+
+    <div class="nav-next">
+      <a href="index.html">← Trang tổng quan</a>
+      <a href="02-retrieval.html">Bài tiếp: Chunking & Truy xuất nâng cao →</a>
+    </div>
+  </div>
+</section>
+
+<script>
+/* ---------- reading progress ---------- */
+addEventListener('scroll',()=>{
+  const h=document.documentElement;
+  document.getElementById('progress').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';
+},{passive:true});
+
+/* ---------- QT demo ---------- */
+const QT={
+ q1:{
+  raw:'cái app bị lỗi thì sao ạ?',
+  docs:['Xử lý lỗi trong SDK: try/catch và error code','Danh sách mã lỗi và cách khắc phục','Hướng dẫn cài đặt SDK lần đầu','Gửi báo cáo lỗi & thu thập log','Ghi chú phát hành phiên bản mới'],
+  none:{q:'cái app bị lỗi thì sao ạ?',hits:[3],note:'Truy vấn mơ hồ chỉ vớt được 1/3 tài liệu liên quan — "bị lỗi" khớp lỏng lẻo.'},
+  rewrite:{q:'Khi ứng dụng phát sinh lỗi runtime thì xử lý thế nào (bắt exception, tra mã lỗi, gửi log báo cáo)?',hits:[0,1,3],note:'Rewrite thêm từ khóa chuẩn ("exception", "mã lỗi", "log") → trúng cả 3 tài liệu đúng. Đây là chiến lược phù hợp.'},
+  stepback:{q:'Quy trình chung khi ứng dụng gặp sự cố là gì?',hits:[0,1],note:'Step-back cũng cải thiện, nhưng câu tổng quát bỏ lỡ nhánh "gửi log báo cáo". Với truy vấn mơ hồ, Rewrite thường trúng hơn.'},
+  decompose:{q:'① Bắt lỗi trong SDK thế nào? ② Tra mã lỗi ở đâu? ③ Gửi báo cáo lỗi ra sao?',hits:[0,1,3],note:'Decompose cũng trúng đủ nhưng tốn 3 lần tìm kiếm — quá tay cho một câu hỏi vốn chỉ mơ hồ chứ không đa ý.'}
+ },
+ q2:{
+  raw:'Timeout mặc định của HttpClient bản 4.2.1 trên Windows là bao nhiêu ms?',
+  docs:['Tổng quan cấu hình HttpClient','Các tham số timeout: connect, read, write','Hướng dẫn cài đặt thư viện HTTP','Best practice khi gọi API bên ngoài','Ghi chú phát hành 4.x'],
+  none:{q:'Timeout mặc định của HttpClient bản 4.2.1 trên Windows là bao nhiêu ms?',hits:[],note:'Kho chỉ có tài liệu tổng quan — không tài liệu nào khớp mức chi tiết này (bản 4.2.1, riêng Windows). Recall = 0.'},
+  rewrite:{q:'Giá trị timeout mặc định của HttpClient phiên bản 4.2.1 trên hệ điều hành Windows?',hits:[1],note:'Rewrite giúp một chút nhưng vẫn quá chi tiết so với kho.'},
+  stepback:{q:'HttpClient có những tham số timeout nào và cấu hình ra sao?',hits:[0,1,3],note:'Step-back trúng lớn: câu tổng quát khớp đúng "độ phân giải" của kho. Đây là chiến lược phù hợp.'},
+  decompose:{q:'① Timeout mặc định HttpClient? ② Khác biệt riêng cho Windows? ③ Thay đổi gì ở bản 4.2.1?',hits:[0,1],note:'Các câu con vẫn chi tiết — vấn đề không phải đa ý mà là kho không có dữ liệu ở độ chi tiết đó.'}
+ },
+ q3:{
+  raw:'So sánh cache Redis và Memcached, và cách cấu hình từng loại?',
+  docs:['Redis: kiến trúc, tính năng & cấu hình','Memcached: kiến trúc, tính năng & cấu hình','Tối ưu truy vấn cơ sở dữ liệu','Ví dụ cấu hình Memcached cho môi trường production','Giám sát & cảnh báo hệ thống'],
+  none:{q:'So sánh cache Redis và Memcached, và cách cấu hình từng loại?',hits:[0],note:'Truy vấn gộp 2 chủ đề → embedding "trung bình cộng" nằm giữa hai cụm, chỉ vớt được 1 phía.'},
+  rewrite:{q:'So sánh chi tiết Redis và Memcached về tính năng và cách cấu hình?',hits:[0,1],note:'Khá hơn, nhưng một embedding vẫn khó phủ trọn hai chủ đề.'},
+  stepback:{q:'Các giải pháp cache in-memory phổ biến gồm những gì?',hits:[0,1],note:'Trúng 2 nhưng bỏ lỡ tài liệu cấu hình chi tiết — câu hỏi này không cần tổng quát hóa.'},
+  decompose:{q:'① Redis có đặc điểm gì? ② Memcached có đặc điểm gì? ③ Cấu hình từng loại thế nào?',hits:[0,1,3],note:'Decompose thắng: mỗi câu con tìm riêng, trúng trọn cả 3 tài liệu liên quan. Đây là chiến lược phù hợp.'}
+ }
+};
+const qtSel=document.getElementById('qt-query');
+const qtModes=[...document.querySelectorAll('#qt-demo .mode')];
+let qtMode='none';
+function qtRender(){
+  const data=QT[qtSel.value], m=data[qtMode];
+  document.getElementById('qt-transformed').textContent=m.q;
+  const ul=document.getElementById('qt-results'); ul.innerHTML='';
+  data.docs.forEach((d,i)=>{
+    const li=document.createElement('li');
+    const hit=m.hits.includes(i);
+    li.className=hit?'hit':'miss';
+    li.innerHTML=(hit?'✔ ':'· ')+d+'<span class="score">'+(hit?'truy xuất':'bỏ qua')+'</span>';
+    ul.appendChild(li);
+  });
+  document.getElementById('qt-hint').textContent='Kết quả: '+m.hits.length+'/'+'3 tài liệu liên quan. '+m.note;
+}
+qtSel.addEventListener('change',qtRender);
+qtModes.forEach(b=>b.addEventListener('click',()=>{
+  qtModes.forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  qtMode=b.dataset.mode; qtRender();
+}));
+qtRender();
+
+/* ---------- HyDE demo ---------- */
+let hydeStep=0;
+const hq=document.getElementById('hyde-q'), hr=document.getElementById('hyde-radius'),
+      hg=document.getElementById('hyde-ghost'), hc=document.getElementById('hyde-caption'),
+      hb=document.getElementById('hyde-step-btn'), hl=document.getElementById('hyde-qlabel');
+const hydeStates=[
+ {btn:'Bước 1: Embed truy vấn thô'},
+ {btn:'Bước 2: LLM sinh tài liệu giả định'},
+ {btn:'Bước 3: Embed tài liệu giả & tìm kiếm'},
+ {btn:'Hoàn tất — nhấn ↺ để xem lại'}
+];
+function hydeApply(){
+  if(hydeStep===1){
+    hc.textContent='Bước 1: Truy vấn thô nằm XA cụm tài liệu đúng — vòng top-k chỉ quét trúng tài liệu lạc đề.';
+    hr.setAttribute('stroke','#B0455A');
+  }else if(hydeStep===2){
+    hg.style.opacity=1;
+    hc.textContent='Bước 2: LLM viết một đoạn "trả lời giả định" — nội dung có thể sai, nhưng văn phong giống tài liệu thật.';
+  }else if(hydeStep===3){
+    hq.setAttribute('cx',565); hq.setAttribute('cy',155);
+    hr.setAttribute('cx',565); hr.setAttribute('cy',155); hr.setAttribute('stroke','#1F8A70');
+    hl.textContent='Embedding tài liệu giả ●'; hl.setAttribute('x',430); hl.setAttribute('y',110); hl.setAttribute('fill','#1F8A70');
+    hc.textContent='Bước 3: Embedding của tài liệu giả rơi giữa cụm đúng — vòng top-k giờ quét trúng cả A, B, C. ✔';
+  }
+  hb.textContent=hydeStates[Math.min(hydeStep,3)].btn;
+  if(hydeStep>=3) hb.disabled=true;
+}
+hb.addEventListener('click',()=>{hydeStep=Math.min(hydeStep+1,3);hydeApply();});
+document.getElementById('hyde-reset').addEventListener('click',()=>{
+  hydeStep=0; hb.disabled=false; hb.textContent=hydeStates[0].btn;
+  hq.setAttribute('cx',140); hq.setAttribute('cy',90);
+  hr.setAttribute('cx',140); hr.setAttribute('cy',90); hr.setAttribute('stroke','#B0455A');
+  hg.style.opacity=0; hc.textContent='Trạng thái: chưa bắt đầu.';
+  hl.textContent='Truy vấn thô ●'; hl.setAttribute('x',60); hl.setAttribute('y',66); hl.setAttribute('fill','#B0455A');
+});
+
+/* ---------- quizzes ---------- */
+document.querySelectorAll('.quiz').forEach(q=>{
+  const ans=+q.dataset.answer, opts=[...q.querySelectorAll('.opt')], expl=q.querySelector('.expl');
+  opts.forEach((o,i)=>o.addEventListener('click',()=>{
+    opts.forEach((x,j)=>{x.classList.remove('right','wrong'); if(j===ans)x.classList.add('right');});
+    if(i!==ans)o.classList.add('wrong');
+    expl.classList.add('show');
+  }));
+});
+</script>
+</body>
+</html>
